@@ -21,9 +21,9 @@ pip install -r requirements.txt
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-## Pick a scenario card
+## Scenario
 
-Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coordinator + a different roster of specialists. Pick one. Different teams should pick different cards.
+The Deal Desk scenario is fully wired in starter code. See [`scenario-cards.md`](./scenario-cards.md) for the coordinator + specialist roster.
 
 ## Core build (25 min)
 
