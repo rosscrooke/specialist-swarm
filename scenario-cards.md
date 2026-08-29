@@ -1,62 +1,74 @@
-# Scenario Cards — Option 3
+# Scenario Cards — Option 3 (Godot)
 
-Each team picks ONE scenario. Each is shaped like real services-firm work: a coordinator who orchestrates and 3-5 specialists who own lanes.
+Each team picks ONE scenario. Each is shaped the same way: a coordinator who
+orchestrates, 3–5 specialists who own lanes, and — the part that makes this
+track different — **a local engine that decides whether the work is correct.**
 
----
-
-## Card A — Deal Desk (default scenario, fully wired in starter code)
-
-**Coordinator:** "Senior Partner — Deal Desk Lead"
-- Reads an inbound RFP
-- Routes work to specialists
-- Synthesises specialist outputs into a branded proposal doc
-
-**Specialists:**
-1. **Pricing Specialist** (skill: pricing-playbook) — decides commercial terms based on RFP scope and past wins
-2. **Legal Reviewer** (skill: legal-checklist) — flags risky RFP requirements and recommends contract positions
-3. **Technical Fit** (skill: product-overview) — assesses whether our product covers the RFP's requirements
-4. **Competitive Intel** (skill: competitive-intel) — identifies which competitors are likely in this deal and how to position
-
-**The trigger:** `synthetic-data/rfp-acme-corp.md` (an RFP from Acme Corp for an enterprise data platform)
-
-**The deliverable:** A branded Word document at `outputs/proposal-response.docx`
+Different teams should pick different cards.
 
 ---
 
-## Card B — M&A Diligence Lite
+## Card A — 2D Platformer Level (default scenario, fully wired in starter code)
 
-**Coordinator:** "M&A Lead"
-- Reads a deal memo and the target's data room
-- Routes diligence work to specialists
-- Produces a structured risk-and-recommendation memo
+**Coordinator:** "Technical Director"
+- Reads a level brief
+- Fans work out to three builders in parallel, then has an integrator assemble
+- On a repair round, routes real Godot errors through the Build Validator
 
 **Specialists:**
-1. **Financial Analyst** — reviews the target's financials, flags concerns
-2. **Legal Diligence** — scans contracts for change-of-control clauses, IP issues, litigation
-3. **Tech Stack Assessor** — evaluates technical debt, integration complexity
-4. **People & Culture** — assesses leadership, retention risk
+1. **Level Designer** (skill: godot-level-layout) — platform geometry, collision, spawn and goal placement
+2. **Player Controller** (skill: gdscript-character-body-2d) — CharacterBody2D movement, coyote time, jump buffering
+3. **Game Feel Specialist** (skill: godot-game-feel) — camera limits and smoothing, Area2D pickups, signal wiring
+4. **Scene Integrator** (skill: godot-scene-format) — assembles main.tscn; owns .tscn format correctness
+5. **Build Validator** (skill: godot-error-triage) — triages real engine output and names the owning specialist
 
-**The trigger:** A synthetic data room (you'll need to extend `synthetic-data/` for this one)
+**The trigger:** `synthetic-data/level-brief-crystal-caverns.md`
 
-**The deliverable:** A diligence memo in docx
+**The deliverable:** A playable scene in `godot_project/`, verified by Godot 4.7
+
+**The gate:** import → instantiate → boot, all headless, all locally
 
 ---
 
-## Card C — Hire-to-Onboard Orchestrator
+## Card B — UI / HUD Screen
 
-**Coordinator:** "Onboarding Lead"
-- Takes a new hire's profile and start date
-- Coordinates the four functions that have to be ready by day 1
+**Coordinator:** "UX Lead"
+- Reads a screen spec and produces a Control-node tree that lays out correctly
 
 **Specialists:**
-1. **Recruiter** — confirms offer terms, captures references status
-2. **IT Provisioning** — generates the laptop + accounts checklist
-3. **Onboarding Buddy Match** — picks a buddy based on team and seniority
-4. **Welcome Packet** — generates personalised welcome content
+1. **Layout** — anchors, containers, margins, responsive behaviour
+2. **Theming** — a Theme resource, fonts, colours, style boxes
+3. **Interaction** — button signals, focus order, keyboard navigation
+4. **Scene Integrator** — assembles the Control tree
+5. **Build Validator** — same role as Card A
 
-**The trigger:** A synthetic new-hire-profile.md
+**Why it is interesting:** Control-node layout is extremely sensitive to
+anchor and container correctness, so the specialist split (layout vs theming
+vs interaction) is genuinely load-bearing rather than cosmetic.
 
-**The deliverable:** A day-1 readiness pack in docx
+**Extra work:** `_validate.gd` should additionally assert that no Control has
+a zero size after one layout pass — the characteristic failure of a bad
+anchor setup, and invisible to the import stage.
+
+---
+
+## Card C — Procedural Level Generator
+
+**Coordinator:** "Tools Lead"
+- Produces a GDScript *tool* that generates levels, rather than a level
+
+**Specialists:**
+1. **Generation Algorithm** — the placement/room algorithm
+2. **Constraint Checker** — guarantees every generated level is completable
+3. **Godot Integration** — `@tool` script, EditorPlugin wiring
+4. **Build Validator** — same role as Card A
+
+**Why it is interesting:** the deliverable is a tool, so verification means
+running the generator N times headlessly and asserting every output is valid.
+The hardest and most impressive of the three.
+
+**Extra work:** the verify stage becomes a loop over generated seeds rather
+than a single scene check.
 
 ---
 
@@ -64,6 +76,7 @@ Each team picks ONE scenario. Each is shaped like real services-firm work: a coo
 
 | If your team is... | Pick |
 | --- | --- |
-| Just want the cleanest path | A (Deal Desk — code is ready) |
-| Most senior partner audience | B (M&A — gravitas) |
-| Most relatable to HR / people-ops clients | C (Hiring) |
+| Wants the cleanest path | A (platformer — code is ready, and it is playable) |
+| Most relatable to enterprise app clients | B (UI — this is the shape of real client work) |
+| Wants the hardest technical demo | C (generator — verification over N runs) |
+| Wants the best two-minute demo | A — nothing beats playing the thing on stage |

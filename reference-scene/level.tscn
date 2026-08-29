@@ -1,0 +1,48 @@
+[gd_scene format=3]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(1152, 48)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ledge"]
+size = Vector2(192, 24)
+
+[node name="Level" type="Node2D"]
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(576, 624)
+
+[node name="Visual" type="ColorRect" parent="Ground"]
+offset_left = -576.0
+offset_top = -24.0
+offset_right = 576.0
+offset_bottom = 24.0
+color = Color(0.18, 0.22, 0.31, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="LedgeA" type="StaticBody2D" parent="."]
+position = Vector2(360, 480)
+
+[node name="Visual" type="ColorRect" parent="LedgeA"]
+offset_left = -96.0
+offset_top = -12.0
+offset_right = 96.0
+offset_bottom = 12.0
+color = Color(0.31, 0.42, 0.58, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LedgeA"]
+shape = SubResource("RectangleShape2D_ledge")
+
+[node name="LedgeB" type="StaticBody2D" parent="."]
+position = Vector2(720, 372)
+
+[node name="Visual" type="ColorRect" parent="LedgeB"]
+offset_left = -96.0
+offset_top = -12.0
+offset_right = 96.0
+offset_bottom = 12.0
+color = Color(0.31, 0.42, 0.58, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LedgeB"]
+shape = SubResource("RectangleShape2D_ledge")

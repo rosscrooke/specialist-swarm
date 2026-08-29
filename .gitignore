@@ -1,0 +1,35 @@
+# Secrets — never commit
+.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Swarm state (agent/session IDs are per-workspace)
+.environment_id
+.coordinator_id
+.specialist_ids.json
+.skill_ids.json
+.last_session_id
+
+# Generated artifacts
+outputs/
+
+# Godot: the import cache and .uid sidecars are regenerated on every import
+godot_project/.godot/
+godot_project/*.uid
+
+# Everything the swarm generates into the project (project.godot and
+# _validate.gd are harness-owned and ARE tracked)
+godot_project/*.tscn
+godot_project/*.gd
+!godot_project/_validate.gd
+
+# Editors / OS
+.idea/
+.DS_Store
+
+# Eval output
+evals/results/

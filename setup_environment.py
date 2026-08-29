@@ -11,6 +11,9 @@ import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def main() -> None:
@@ -26,7 +29,7 @@ def main() -> None:
 
     client = Anthropic()
     environment = client.beta.environments.create(
-        name="specialist-swarm-env",
+        name="godot-scene-swarm-env",
         config={
             "type": "cloud",
             "networking": {"type": "unrestricted"},

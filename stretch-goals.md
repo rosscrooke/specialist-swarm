@@ -1,78 +1,98 @@
-# Stretch Goals — Option 3
+# Stretch Goals — Option 3 (Godot)
 
-Pick at least one. The big-ticket ones (S1, S2, S5) are the ones that make the demo really sing.
-
----
-
-## Tier 1 — Make it your own
-
-### S1. Codify YOUR firm's voice as a Skill
-Every services firm has a distinctive voice. Create `skills/your-firm-voice/SKILL.md` codifying yours. Some flavors to start from:
-
-- **Transformation-led voice**: confident, business-case-anchored, lots of "What this means for you"
-- **Risk-anchored voice**: conservative, peer-benchmarked, lots of "industry leaders are…"
-- **Delivery-anchored voice**: "we'll make it real" framing, lots of implementation specifics
-
-Add the skill to the coordinator's skill list. Re-run the deal. The output should now sound like *your* firm wrote it.
-
-**Why this lands:** Skills are the easiest knob to turn for partner-specific customisation. Each partner in the room will want their own. This is the demo that gets them to lean forward.
+Pick at least one. S1 and S4 are the ones that make the demo sing.
 
 ---
 
-## Tier 2 — Make the swarm smarter
+## Tier 1 — Make the swarm smarter
 
-### S2. The Critic sub-agent
-Run `python stretch_critic_subagent.py`. This adds a fifth agent whose only job is to push back on the coordinator's draft before it ships. The coordinator now MUST consult the critic before producing the final doc. Watch what happens to quality.
+### S1. The Playtest Critic
+Run `python stretch_playtest_subagent.py`. This adds a sixth agent that judges
+whether the level is *fun and fair* — reasoning from the platform table and
+the controller's tuning numbers to check that every required jump is actually
+possible, that the level teaches before it tests, and that rewards are visible
+before the player commits.
 
-**Why this lands:** Demonstrates an adversarial review pattern inside the swarm. Maps directly to how real services firms run a partner review.
+**Why this lands:** it draws the line the whole track is about. The engine
+answers "does it load?"; the critic answers "is it any good?". Two different
+kinds of verification, and clients need both.
 
-### S3. Memory across deals
-Wire up the [Memory tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool) to the coordinator. Run two consecutive deals from different fictional customers. The second deal should reference what the coordinator learned from the first ("we typically win these on TCO, not headline price — Acme last quarter…").
+### S2. Make the level brief yours
+Replace `synthetic-data/level-brief-crystal-caverns.md` with a brief for a
+game your team actually wants to see. The swarm is not tuned to the sample.
 
-**Why this lands:** Now the swarm gets better over time, not just on this one deal.
-
-### S4. Parallelism: explicitly fan out
-Modify the coordinator's prompt to instruct: "delegate to all four specialists in a SINGLE message — do not wait between them." Then watch the events stream — all four threads should spawn within seconds of each other.
-
-This is the visible parallelism story.
-
-**Why this lands:** This is the visual that lands the architecture pitch. "Four specialists, parallel, one synthesis."
+**Why this lands:** it proves the pipeline is general, not a demo rigged to
+one input.
 
 ---
 
-## Tier 3 — Wire the system to the real world
+## Tier 2 — Harden the loop
 
-### S5. Add a synthetic CRM MCP
-Build a tiny MCP server that exposes "past wins" as a queryable API instead of a JSON file. Wire it to the Pricing Specialist. Now the specialist queries a real-looking system instead of reading a static file.
+### S3. TileMapLayer instead of coloured rectangles
+The starter deliberately uses `StaticBody2D` + `ColorRect` platforms, because
+TileMapLayer serialises tiles as a packed integer array bound to a TileSet
+texture — a high-failure-rate surface for text authoring, and it needs a
+binary asset. Add a generated 4-tile PNG to the scaffold and extend the
+`godot-scene-format` skill with the `tile_data = PackedInt32Array(...)`
+encoding.
 
-**Why this lands:** This is the architecture they'll deploy at clients. CRM, ITSM, PSA — every one of these gets wrapped in an MCP and consumed by specialists.
+**Why this lands:** it is the honest hard version, and it will teach you more
+about where LLM scene authoring actually breaks than anything else here.
 
-### S6. Add a Slack notification step
-Add a fifth specialist whose only job is to post the deal status to a Slack channel as the swarm progresses ("Pricing in — Legal flagged 3 issues — coordinator finalising"). Lets you watch the swarm work from a Slack channel.
+### S4. Show the repair loop failing, then converging
+Run once, hand-corrupt a line of the generated `player.gd`, and re-run with
+`--max-rounds 1`. Watch the error reach the swarm and come back patched.
 
-**Why this lands:** Bridges the swarm into a real workflow surface.
+**Why this lands:** the strongest two minutes in the deck. It is the moment
+the audience realises the agents are getting ground truth, not guessing.
 
-### S7. Output a real .pptx instead of .docx
-Add the [pptx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart) to the coordinator. Have the coordinator produce a 5-slide pitch deck version of the proposal in addition to the docx.
+### S5. Screenshot the result
+Headless Godot uses a dummy rasteriser and renders nothing, so this needs a
+real display driver rather than `--headless`. Get a PNG out and attach it to
+the run.
 
-**Why this lands:** Now you're producing both a written proposal AND an executive deck from one swarm. That's the actual deliverable for a real deal.
+**Why this lands:** closes the loop visually — and a screenshot in the
+transcript is what makes the artefact shareable.
+
+---
+
+## Tier 3 — Wire it to the real world
+
+### S6. Skills from the repo instead of uploads
+Mount this repository as a session resource and let Godot skills load from
+its root `.claude/skills` directory, so a skill edit ships with a commit
+instead of an upload script.
+
+**Why this lands:** this is how clients will actually version agent knowledge.
+
+### S7. A regression suite
+Keep every brief you run in `synthetic-data/`, and add a script that runs all
+of them and reports the pass rate. Now a change to a skill has a measurable
+effect.
+
+**Why this lands:** turns prompt-tinkering into engineering. This is the
+single most valuable thing to take back to a client.
+
+### S8. Cost instrumentation
+Read `usage.list_cost` off the session and print cost per successful scene,
+broken down by round. Compare `SWARM_VALIDATOR_MODEL=claude-haiku-4-5`
+against the Opus default.
+
+**Why this lands:** every client asks "what does this cost to run". Have the
+number.
 
 ---
 
 ## Tier 4 — For the showoffs
 
-### S8. The escalation pattern
-Add a "Strategic Pricing" sub-agent that uses claude-opus-4-7. The Pricing Specialist (which uses Sonnet) should delegate to Strategic Pricing only when the deal exceeds $500K. Demonstrates the "escalation" multi-agent pattern from the docs.
-
 ### S9. The voting pattern
-For the contentious calls (e.g., "should we accept the MFN clause?"), spawn three parallel copies of the Legal Reviewer, each with a slightly different system prompt (conservative / balanced / aggressive). Have the coordinator synthesise their three opinions.
+Spawn three Level Designers with different personalities (conservative /
+balanced / cruel) and have the Playtest Critic pick a winner.
 
-**Why this lands:** Shows how to use multi-agent for *judgment* problems, not just task parallelism.
-
-### S10. The recursion pattern
-After producing the docx, have the coordinator generate a question for itself: "What's the riskiest assumption in this proposal?" Spawn a new session to investigate that question. Loop until the coordinator says "stop."
-
-This is genuine autonomous agentic work. Don't run it in a paid workspace without spend caps.
+### S10. Close the loop entirely
+Feed the Playtest Critic's verdict back as a new brief and let the swarm
+iterate on its own level until the critic says SHIP IT. Set a session budget
+before you try this.
 
 ---
 
@@ -80,7 +100,7 @@ This is genuine autonomous agentic work. Don't run it in a paid workspace withou
 
 | If your team has 20 minutes | Pick |
 | --- | --- |
-| Best visual demo punchline | S2 (Critic) or S4 (explicit parallelism) |
-| Best for selling to your firm internally | S1 (your firm's voice as a Skill) |
-| Best architecture demo for client CIO | S5 (synthetic CRM MCP) |
-| Best "next quarter we should build this" outcome | S6 + S7 (Slack + pptx output) |
+| Best demo punchline | S4 (watch it repair itself) |
+| Best "we should build this" outcome | S7 (regression suite) |
+| Best answer to a CFO | S8 (cost per scene) |
+| Hardest, most instructive | S3 (TileMapLayer) |
