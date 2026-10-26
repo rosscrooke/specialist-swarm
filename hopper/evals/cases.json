@@ -1,0 +1,462 @@
+{
+ "_about": "Hopper agent evals. mode_spec is the product definition of each Mode, written down independently of app/modes.py so a code change that drifts from the spec fails. trips are golden trip requests; intents are rider messages with the fields the Intent agent must extract.",
+ "mode_spec": {
+  "hustle": {
+   "goal": "fastest",
+   "max_walk_leg_mi": 0.4,
+   "max_total_walk_mi": 0.8,
+   "top_within_fastest_pct": 15
+  },
+  "broke": {
+   "goal": "budget",
+   "max_walk_leg_mi": 1.5,
+   "max_total_walk_mi": 2.5,
+   "ride_last_resort": true,
+   "top_within_cheapest_usd": 0.5,
+   "max_slowdown_vs_fastest_transit": 2.5,
+   "min_saving_per_hour_usd": 3.0
+  },
+  "burn": {
+   "goal": "part transit / part workout",
+   "max_walk_leg_mi": 2.0,
+   "max_total_walk_mi": 3.0,
+   "max_slowdown_vs_fastest_transit": 2.0,
+   "needs_transit": true,
+   "min_active_share": 0.4,
+   "top_within_max_kcal_pct": 20
+  }
+ },
+ "trips": [
+  {
+   "id": "ferry-to-painted-ladies-am",
+   "origin": "ferry_building",
+   "destination": "painted_ladies",
+   "hour": 8,
+   "weather": "clear"
+  },
+  {
+   "id": "ferry-to-painted-ladies-rain",
+   "origin": "ferry_building",
+   "destination": "painted_ladies",
+   "hour": 8,
+   "weather": "rain",
+   "expect": {
+    "no_bikes": true
+   }
+  },
+  {
+   "id": "union-square-to-sfo",
+   "origin": "union_square",
+   "destination": "sfo",
+   "hour": 17,
+   "weather": "clear",
+   "expect": {
+    "broke_top_uses": [
+     "bart"
+    ],
+    "broke_top_no_ride": true
+   }
+  },
+  {
+   "id": "mission-to-coit-fog",
+   "origin": "mission_16th",
+   "destination": "coit_tower",
+   "hour": 12,
+   "weather": "fog"
+  },
+  {
+   "id": "ocean-beach-to-salesforce",
+   "origin": "ocean_beach",
+   "destination": "salesforce_tower",
+   "hour": 9,
+   "weather": "clear",
+   "expect": {
+    "broke_top_no_ride": true
+   }
+  },
+  {
+   "id": "castro-to-giants-game",
+   "origin": "castro",
+   "destination": "oracle_park",
+   "hour": 18,
+   "weather": "clear",
+   "event": true
+  },
+  {
+   "id": "wharf-to-twin-peaks-flat",
+   "origin": "fishermans_wharf",
+   "destination": "twin_peaks",
+   "hour": 14,
+   "weather": "clear",
+   "avoid_steep": true,
+   "expect": {
+    "no_steep_walks": true
+   }
+  },
+  {
+   "id": "caltrain-to-warriors-rain",
+   "origin": "caltrain",
+   "destination": "chase_center",
+   "hour": 19,
+   "weather": "rain",
+   "event": true,
+   "expect": {
+    "no_bikes": true
+   }
+  },
+  {
+   "id": "nob-hill-to-dolores-under-5",
+   "origin": "nob_hill",
+   "destination": "dolores_park",
+   "hour": 10,
+   "weather": "clear",
+   "max_cost": 5,
+   "expect": {
+    "max_cost": 5
+   }
+  },
+  {
+   "id": "ggp-to-fidi-commute",
+   "origin": "golden_gate_park",
+   "destination": "montgomery",
+   "hour": 7,
+   "weather": "clear"
+  },
+  {
+   "id": "pier-39-to-lombard-short",
+   "origin": "pier_39",
+   "destination": "lombard_st",
+   "hour": 15,
+   "weather": "clear"
+  },
+  {
+   "id": "presidio-to-civic-late",
+   "origin": "presidio",
+   "destination": "civic_center",
+   "hour": 22,
+   "weather": "clear"
+  }
+ ],
+ "intents": [
+  {
+   "q": "from ferry building to coit tower",
+   "expect": {
+    "origin": "ferry_building",
+    "destination": "coit_tower"
+   }
+  },
+  {
+   "q": "get me to the giants game by 6pm, cheap",
+   "expect": {
+    "destination": "oracle_park",
+    "hour": 18,
+    "event": true,
+    "mode": "broke"
+   }
+  },
+  {
+   "q": "fastest way from union square to the airport",
+   "expect": {
+    "origin": "union_square",
+    "destination": "sfo",
+    "mode": "hustle"
+   }
+  },
+  {
+   "q": "from the mission to twin peaks, I want a workout",
+   "expect": {
+    "origin": "mission_16th",
+    "destination": "twin_peaks",
+    "mode": "burn"
+   }
+  },
+  {
+   "q": "bar hop from hayes valley to the mission tonight",
+   "expect": {
+    "origin": "hayes_valley",
+    "mode": "barcrawl"
+   }
+  },
+  {
+   "q": "from castro to dolores park under $5",
+   "expect": {
+    "origin": "castro",
+    "destination": "dolores_park",
+    "max_cost": 5
+   }
+  },
+  {
+   "q": "take me to ocean beach, it's raining",
+   "expect": {
+    "destination": "ocean_beach",
+    "weather": "rain"
+   }
+  },
+  {
+   "q": "from 500 folsom st to chase center",
+   "expect": {
+    "destination": "chase_center",
+    "origin_text": "500 folsom st"
+   },
+   "absent": [
+    "origin"
+   ]
+  },
+  {
+   "q": "from nob hill to fishermans wharf, avoid hills",
+   "expect": {
+    "origin": "nob_hill",
+    "destination": "fishermans_wharf",
+    "avoid_steep": true
+   }
+  },
+  {
+   "q": "from ggp to fidi, I'm late",
+   "expect": {
+    "origin": "golden_gate_park",
+    "destination": "montgomery",
+    "mode": "hustle"
+   }
+  },
+  {
+   "q": "from king's cross to big ben",
+   "sf_context": false,
+   "expect": {
+    "origin_text": "king's cross",
+    "destination_text": "big ben"
+   },
+   "absent": [
+    "origin",
+    "destination"
+   ]
+  },
+  {
+   "q": "from shibuya crossing to tokyo tower",
+   "sf_context": false,
+   "expect": {
+    "destination_text": "tokyo tower"
+   },
+   "absent": [
+    "origin",
+    "destination"
+   ]
+  },
+  {
+   "q": "warriors game tonight from powell, leaving at 7pm",
+   "llm_only": true,
+   "expect": {
+    "origin": "powell",
+    "destination": "chase_center",
+    "event": true,
+    "hour": 19
+   }
+  },
+  {
+   "q": "I'm broke, need to get from the painted ladies over to the wharf",
+   "llm_only": true,
+   "expect": {
+    "origin": "painted_ladies",
+    "destination": "fishermans_wharf",
+    "mode": "broke"
+   }
+  }
+ ],
+ "world": [
+  {
+   "id": "paris-eiffel-to-louvre",
+   "origin_place": {
+    "name": "Eiffel Tower",
+    "lat": 48.8584,
+    "lon": 2.2945
+   },
+   "destination_place": {
+    "name": "Louvre Museum",
+    "lat": 48.8606,
+    "lon": 2.3376
+   },
+   "hour": 9,
+   "weather": "clear",
+   "expect": {
+    "tz": "Europe/Paris",
+    "units": "km",
+    "uses_transit": true
+   }
+  },
+  {
+   "id": "london-kings-cross-to-big-ben-rain",
+   "origin_place": {
+    "name": "King's Cross",
+    "lat": 51.5308,
+    "lon": -0.1238
+   },
+   "destination_place": {
+    "name": "Big Ben",
+    "lat": 51.5007,
+    "lon": -0.1246
+   },
+   "hour": 17,
+   "weather": "rain",
+   "expect": {
+    "tz": "Europe/London",
+    "units": "mi",
+    "uses_transit": true,
+    "no_bikes": true
+   }
+  },
+  {
+   "id": "tokyo-shibuya-to-tokyo-tower",
+   "origin_place": {
+    "name": "Shibuya Crossing",
+    "lat": 35.6595,
+    "lon": 139.7005
+   },
+   "destination_place": {
+    "name": "Tokyo Tower",
+    "lat": 35.6586,
+    "lon": 139.7454
+   },
+   "hour": 10,
+   "weather": "clear",
+   "expect": {
+    "tz": "Asia/Tokyo",
+    "units": "km",
+    "uses_transit": true
+   }
+  },
+  {
+   "id": "nyc-times-square-to-brooklyn-bridge",
+   "origin_place": {
+    "name": "Times Square",
+    "lat": 40.758,
+    "lon": -73.9855
+   },
+   "destination_place": {
+    "name": "Brooklyn Bridge Park",
+    "lat": 40.7003,
+    "lon": -73.9967
+   },
+   "hour": 8,
+   "weather": "clear",
+   "expect": {
+    "tz": "America/New_York",
+    "units": "mi",
+    "uses_transit": true
+   }
+  }
+ ],
+ "flights": [
+  {
+   "id": "union-square-to-times-square",
+   "origin": "union_square",
+   "destination_place": {
+    "name": "Times Square",
+    "lat": 40.758,
+    "lon": -73.9855
+   },
+   "hour": 9,
+   "modes": [
+    "hustle",
+    "broke"
+   ],
+   "expect": {
+    "dep_airports": [
+     "SFO",
+     "OAK",
+     "SJC"
+    ],
+    "arr_airports": [
+     "JFK",
+     "LGA",
+     "EWR"
+    ],
+    "broke_ground_no_ride": true
+   }
+  },
+  {
+   "id": "ferry-to-santa-monica",
+   "origin": "ferry_building",
+   "destination_place": {
+    "name": "Santa Monica Pier",
+    "lat": 34.0094,
+    "lon": -118.4973
+   },
+   "hour": 7,
+   "modes": [
+    "hustle",
+    "broke"
+   ],
+   "expect": {
+    "arr_airports": [
+     "LAX",
+     "BUR",
+     "LGB",
+     "SNA"
+    ]
+   }
+  },
+  {
+   "id": "mission-to-pike-place",
+   "origin": "mission_16th",
+   "destination_place": {
+    "name": "Pike Place Market",
+    "lat": 47.6097,
+    "lon": -122.3422
+   },
+   "hour": 12,
+   "modes": [
+    "hustle"
+   ],
+   "expect": {
+    "arr_airports": [
+     "SEA",
+     "PAE"
+    ]
+   }
+  }
+ ],
+ "crawls": [
+  {
+   "id": "north-beach-any",
+   "start": "washington_sq",
+   "stops": 3,
+   "vibe": "any",
+   "hour": 20,
+   "weather": "clear"
+  },
+  {
+   "id": "mission-cocktails-end-castro",
+   "start": "mission_16th",
+   "end": "castro",
+   "stops": 4,
+   "vibe": "cocktail",
+   "hour": 21,
+   "weather": "clear"
+  },
+  {
+   "id": "castro-lgbtq-rain",
+   "start": "castro",
+   "stops": 3,
+   "vibe": "lgbtq",
+   "hour": 21,
+   "weather": "rain"
+  },
+  {
+   "id": "union-square-five-end-ferry",
+   "start": "union_square",
+   "end": "ferry_building",
+   "stops": 5,
+   "vibe": "any",
+   "hour": 19,
+   "weather": "clear"
+  },
+  {
+   "id": "hayes-wine-two",
+   "start": "hayes_valley",
+   "stops": 2,
+   "vibe": "wine",
+   "hour": 18,
+   "weather": "clear",
+   "minutes_per_stop": 60
+  }
+ ]
+}

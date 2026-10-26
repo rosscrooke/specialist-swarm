@@ -1,0 +1,7 @@
+# Runtime
+flask>=3.0,<4
+anthropic>=0.40          # optional at runtime: only used when ANTHROPIC_API_KEY is set
+tzdata                   # time zones on systems without an OS zone database
+
+# Tests
+pytest>=8,<9

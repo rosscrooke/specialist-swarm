@@ -1,0 +1,1511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Hopper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css"
+      integrity="sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK" crossorigin="anonymous">
+<style>
+  /* Ride-app structure (full-bleed map, floating panel / bottom sheet, black CTA) with
+     Hopper's own identity: Barlow signage type and International Orange for the Mode. */
+  :root {
+    --bg: #ffffff; --surface: #f2f3f4; --surface-2: #e7e9eb; --ink: #000000; --ink-2: #545b62;
+    --ink-3: #8a9198; --rule: #e4e6e8; --cta: #000000; --cta-ink: #ffffff;
+    --orange: #e5482a; --orange-ink: #ffffff; --orange-wash: #fdebe6;
+    --focus: #276ef1; --warn: #b42318; --ok: #12a150;
+    --shadow: 0 8px 28px rgb(0 0 0 / .14), 0 1px 3px rgb(0 0 0 / .08);
+    --m-walk: #12a150; --m-ride: #000000; --m-muni: #d92d20; --m-bart: #276ef1;
+    --m-cable: #a15c07; --m-bike: #7a3ff2; --m-ebike: #c11574;
+    --m-bus: #e04f16; --m-tram: #0e9384; --m-metro: #2e90fa; --m-rail: #9e165f; --m-ferry: #0086c9;
+    --display: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+    --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --sheet: 58vh;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16191c; --surface: #23272b; --surface-2: #2e3338; --ink: #f4f5f6; --ink-2: #b3bac1;
+      --ink-3: #828a92; --rule: #2c3136; --cta: #ffffff; --cta-ink: #000000;
+      --orange: #ff6b47; --orange-ink: #1b0b06; --orange-wash: #3a1d16;
+      --focus: #7aa7ff; --warn: #fda29b; --ok: #47cd89; --m-ride: #f4f5f6;
+      --shadow: 0 8px 28px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16191c; --surface: #23272b; --surface-2: #2e3338; --ink: #f4f5f6; --ink-2: #b3bac1;
+    --ink-3: #828a92; --rule: #2c3136; --cta: #ffffff; --cta-ink: #000000;
+    --orange: #ff6b47; --orange-ink: #1b0b06; --orange-wash: #3a1d16;
+    --focus: #7aa7ff; --warn: #fda29b; --ok: #47cd89; --m-ride: #f4f5f6;
+    --shadow: 0 8px 28px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 400 16px/1.45 var(--body); color: var(--ink); background: var(--bg);
+         -webkit-font-smoothing: antialiased; overflow: hidden; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  svg.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8;
+          stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  #map { position: fixed; inset: 0; z-index: 0; background: var(--surface); }
+
+  /* Panel: floating card on desktop, bottom sheet on phones. */
+  .panel { position: fixed; z-index: 10; display: flex; flex-direction: column; background: var(--bg);
+           box-shadow: var(--shadow); left: 16px; top: 16px; bottom: 16px; width: 420px; border-radius: 16px;
+           overflow: hidden; }
+  .handle { display: none; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 24px; }
+  .cta-bar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); background: var(--bg); }
+  .cta { width: 100%; height: 54px; border: 0; border-radius: 10px; background: var(--cta); color: var(--cta-ink);
+         font: 600 18px/1 var(--body); }
+  .cta:disabled { opacity: .5; cursor: not-allowed; }
+  .cta.secondary { background: var(--surface); color: var(--ink); }
+
+  /* Brand + account */
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .brand h1 { font: 800 28px/1 var(--display); margin: 0; letter-spacing: -0.01em; }
+  .acct-btn { margin-left: auto; height: 36px; border: 0; border-radius: 18px; background: var(--surface);
+              display: inline-flex; align-items: center; gap: 8px; padding: 0 12px 0 4px; font-weight: 600; font-size: 14px; }
+  .acct-btn .av { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--bg);
+                  display: grid; place-items: center; font: 700 14px/1 var(--display); }
+  .acct-btn.out { padding: 0 14px; }
+
+  /* Route inputs — origin dot, destination square, joined by a line (ride-app convention). */
+  .route { position: relative; background: var(--surface); border-radius: 12px; padding: 6px 48px 6px 40px; }
+  .route::before { content: ""; position: absolute; left: 19px; top: 30px; bottom: 30px; width: 2px; background: var(--ink); }
+  .route .o, .route .d { position: absolute; left: 14px; width: 12px; height: 12px; background: var(--ink); }
+  .route .o { top: 24px; border-radius: 50%; }
+  .route .d { bottom: 24px; }
+  .place-input { width: 100%; height: 48px; border: 0; background: transparent; font-size: 17px; font-weight: 500; padding: 0; }
+  .place-input::placeholder { color: var(--ink-3); font-weight: 400; }
+  .place-input:focus { outline: none; }
+  .route:focus-within { box-shadow: 0 0 0 2px var(--ink); }
+  .route .sep { height: 1px; background: var(--rule); }
+  .swap { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px;
+          border-radius: 50%; border: 0; background: var(--bg); display: grid; place-items: center; box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+
+  /* Suggestions */
+  .suggest { list-style: none; margin: 8px 0 0; padding: 0; }
+  .suggest li[role=option] { display: flex; align-items: center; gap: 14px; padding: 10px 6px; border-radius: 10px; cursor: pointer; }
+  .suggest li[role=option][aria-selected=true], .suggest li[role=option]:hover { background: var(--surface); }
+  .suggest .ic, .places .ic { width: 36px; height: 36px; flex: none; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+  .suggest li[aria-selected=true] .ic { background: var(--surface-2); }
+  .suggest b { display: block; font-weight: 600; }
+  .suggest .s { font-size: 14px; color: var(--ink-2); }
+  .suggest .grp { font-size: 13px; font-weight: 600; color: var(--ink-3); padding: 10px 6px 2px; }
+  .suggest .empty { font-size: 14px; color: var(--ink-2); padding: 10px 6px; }
+
+  .ask { position: relative; margin-top: 10px; }
+  .ask svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-3); }
+  .ask input { width: 100%; height: 48px; border: 1px solid var(--rule); border-radius: 12px; padding: 0 14px 0 42px;
+               background: var(--bg); font-size: 16px; }
+  .ask input::placeholder { color: var(--ink-3); }
+
+  /* Saved-place shortcuts (Home, Work, …) */
+  .shortcuts { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+  .shortcuts::-webkit-scrollbar { display: none; }
+  .shortcut { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+              border-radius: 18px; border: 1px solid var(--rule); background: var(--bg); font-size: 14px; font-weight: 600; }
+  .shortcut span { font-weight: 400; color: var(--ink-2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Mode chips */
+  .modes { display: flex; gap: 8px; margin: 16px 0 4px; overflow-x: auto; scrollbar-width: none; }
+  .modes::-webkit-scrollbar { display: none; }
+  .mode { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px 0 12px;
+          border-radius: 22px; border: 0; background: var(--surface); font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .mode small { font-weight: 400; color: var(--ink-2); font-size: 13px; }
+  .mode:hover { background: var(--surface-2); }
+  .mode.active { background: var(--orange); color: var(--orange-ink); }
+  .mode.active small { color: inherit; opacity: .85; }
+
+  /* Condition pills (leave time, weather, budget, toggles) */
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pill { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+          border-radius: 18px; background: var(--surface); font-size: 14px; font-weight: 500; border: 0; }
+  .pill select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .pill input[type=number] { width: 56px; border: 0; background: transparent; font-weight: 500; padding: 0; }
+  .pill.toggle input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+  .pill.toggle:has(input:checked) { background: var(--ink); color: var(--bg); }
+  .pill:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .section-title { font: 700 20px/1.2 var(--display); margin: 22px 0 6px; }
+  .cities { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cities button { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid var(--rule); background: var(--bg); font-weight: 600; font-size: 14px; }
+  .cities button[aria-pressed=true] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .places { list-style: none; margin: 0; padding: 0; }
+  .places button { width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 0; border: 0;
+                   background: none; text-align: left; border-bottom: 1px solid var(--rule); }
+  .places b { display: block; font-weight: 600; }
+  .places span.s { font-size: 14px; color: var(--ink-2); }
+
+  /* Crawl form bits */
+  .vibes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .vibes button { height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: var(--surface); font-weight: 500; }
+  .vibes button.on { background: var(--ink); color: var(--bg); }
+  .fine { font-size: 13px; color: var(--ink-3); margin: 12px 0 0; }
+  .error { color: var(--warn); font-weight: 500; margin-top: 12px; }
+  .notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--orange-wash); font-size: 14px; }
+
+  details.more { margin-top: 18px; }
+  details.more summary { cursor: pointer; font-weight: 600; font-size: 15px; list-style: none; display: flex;
+                         align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--rule); }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more summary::after { content: "+"; font-size: 20px; color: var(--ink-2); }
+  details.more[open] summary::after { content: "−"; }
+  .sliders { display: grid; gap: 8px; margin-bottom: 12px; }
+  .slider { display: grid; grid-template-columns: 64px 1fr 30px; gap: 10px; align-items: center; font-size: 14px; }
+  .slider input { accent-color: var(--orange); }
+  .slider b { text-align: right; font-variant-numeric: tabular-nums; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .field label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+  .field input, .field select { width: 100%; height: 44px; border-radius: 8px; border: 1px solid transparent; background: var(--surface); padding: 0 12px; }
+  .field input:focus { border-color: var(--ink); outline: none; }
+
+  /* Results header */
+  .rhead { display: flex; align-items: flex-start; gap: 10px; }
+  .back { width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%; background: var(--surface);
+          display: grid; place-items: center; }
+  .rhead h2 { font: 700 22px/1.15 var(--display); margin: 2px 0 0; }
+  .rhead p { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); }
+  .conditions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .cond { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 14px;
+          background: var(--surface); font-size: 13px; color: var(--ink-2); }
+  .cond .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+  .cond.on .dot { background: var(--ok); }
+
+  /* Trip rows — ride-list pattern: icons, title + arrival, price on the right. */
+  .opts { margin-top: 10px; }
+  .opt { border: 2px solid transparent; border-radius: 12px; margin: 0 -10px; }
+  .opt.active { border-color: var(--ink); }
+  .opt-head { width: 100%; display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center;
+              padding: 12px 10px; background: none; border: 0; text-align: left; }
+  .glyphs { display: flex; align-items: center; gap: 2px; }
+  .glyph { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--c); }
+  .glyph svg { width: 17px; height: 17px; stroke-width: 2; }
+  .glyph.more { background: var(--surface-2); color: var(--ink-2); font-size: 12px; font-weight: 700; }
+  .opt-title { font-weight: 700; font-size: 17px; line-height: 1.2; }
+  .opt-sub { font-size: 14px; color: var(--ink-2); }
+  .opt-sub b { color: var(--ink); font-weight: 600; }
+  .opt-price { text-align: right; font: 700 20px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .opt-price small { display: block; margin-top: 4px; font: 400 13px var(--body); color: var(--ink-2); }
+  .tagline { display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--orange); }
+  .detail { padding: 0 10px 14px; }
+
+  /* Line diagram inside the selected trip */
+  .line { display: flex; margin: 16px 4px 4px 6px; }
+  .seg { position: relative; min-width: 34px; padding-top: 18px; }
+  .seg .bar { height: 6px; background: var(--c); border-radius: 3px; transform-origin: left center; }
+  .seg.walk .bar { background: radial-gradient(circle, var(--c) 2.2px, transparent 2.6px) 0 50% / 9px 6px repeat-x; }
+  .seg .lbl { position: absolute; top: 0; left: 10px; right: 4px; font-size: 12px; font-weight: 600; color: var(--c);
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg::before, .line .end { content: ""; position: absolute; z-index: 1; top: 14px; left: -6px; width: 14px; height: 14px;
+                             border-radius: 50%; background: var(--bg); border: 3px solid var(--ink); }
+  .seg:first-child::before { background: var(--ink); }
+  .line .end-wrap { position: relative; width: 0; }
+  .line .end { left: -8px; border-radius: 3px; background: var(--ink); }
+  .draw .seg .bar { animation: draw .45s cubic-bezier(.3,.7,.2,1) backwards; }
+  .draw .seg:nth-child(2) .bar { animation-delay: .1s; }
+  .draw .seg:nth-child(3) .bar { animation-delay: .2s; }
+  .draw .seg:nth-child(4) .bar { animation-delay: .3s; }
+  @keyframes draw { from { transform: scaleX(0); } }
+
+  .legs { list-style: none; margin: 12px 0 0; padding: 0; }
+  .legs li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 6px 0; font-size: 14px; }
+  .legs .ldot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin: 5px 0 0 6px; }
+  .legs b { font-weight: 600; }
+  .legs .x { color: var(--ink-2); }
+  .why { margin: 10px 0 0; font-size: 14px; color: var(--ink-2); }
+  .flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .flags span { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--surface); color: var(--ink-2); }
+
+  /* Loading skeleton */
+  .skel { display: grid; grid-template-columns: 62px 1fr 60px; gap: 12px; align-items: center; padding: 14px 0; }
+  .skel i { display: block; height: 14px; border-radius: 7px; background: var(--surface); }
+  .skel i:first-child { height: 30px; border-radius: 15px; }
+  .skel i:nth-child(2) { width: 70%; }
+  .loading .skel i { background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%) 0 0 / 200% 100%;
+                     animation: shimmer 1.2s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .loading-msg { font-size: 14px; color: var(--ink-2); margin-top: 6px; }
+
+  /* Bar Crawl timeline (a real sequence, so numbered) */
+  .crawl .stop { position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 10px 0; }
+  .crawl .stop::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--rule); }
+  .crawl .stop:first-child::before { top: 20px; }
+  .crawl .stop.last::before { bottom: calc(100% - 20px); }
+  .crawl .n { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--bg);
+              display: grid; place-items: center; font: 700 15px/1 var(--display); }
+  .crawl .n.walk { width: 12px; height: 12px; margin: 8px; background: var(--bg); border: 2px solid var(--m-walk); }
+  .crawl .n.ride { width: 12px; height: 12px; margin: 8px; border-radius: 2px; }
+  .crawl h3 { font: 700 18px/1.2 var(--display); margin: 0; }
+  .crawl .t { font-size: 14px; color: var(--ink-2); }
+  .crawl a { color: var(--focus); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--ink-2); font-weight: 600; }
+  #rejected ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
+
+  /* Map chrome */
+  .leaflet-container { font-family: var(--body); background: var(--surface); }
+  .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow) !important; border-radius: 10px !important; overflow: hidden; }
+  .leaflet-control-zoom a { background: var(--bg) !important; color: var(--ink) !important; border-color: var(--rule) !important; }
+  .leaflet-tooltip.eta { background: #000; color: #fff; border: 0; border-radius: 6px; font: 600 12px/1 var(--body);
+                         padding: 6px 8px; box-shadow: 0 2px 6px rgb(0 0 0 / .3); }
+  .leaflet-tooltip.eta::before { border-top-color: #000; }
+  .m-dest { width: 16px; height: 16px; background: #000; border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+  .m-orig { width: 16px; height: 16px; border-radius: 50%; background: #000; border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+  .pin { width: 28px; height: 28px; border-radius: 50%; background: #000; color: #fff; display: grid; place-items: center;
+         font: 700 14px/1 var(--display); border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+
+  /* Ride chooser */
+  .rides { list-style: none; margin: 12px 0 0; padding: 0; }
+  .rides li { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 10px;
+              border: 2px solid transparent; border-radius: 12px; cursor: pointer; }
+  .rides li[aria-selected=true] { border-color: var(--ink); }
+  .rides li[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
+  .rides .car { width: 44px; height: 44px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; }
+  .rides b { font-weight: 700; }
+  .rides .s { font-size: 14px; color: var(--ink-2); }
+  .rides .p { text-align: right; font: 700 18px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+  .rides .p small { display: block; font: 400 12px var(--body); color: var(--ink-2); }
+  .compare { display: flex; gap: 8px; margin-top: 10px; }
+  .compare a { flex: 1; text-align: center; height: 42px; line-height: 42px; border-radius: 10px; background: var(--surface);
+               color: var(--ink); font-weight: 600; text-decoration: none; }
+
+  /* Flights */
+  .fl { border: 2px solid transparent; border-radius: 12px; padding: 12px 10px; margin: 6px -10px 0; cursor: pointer; }
+  .fl.active { border-color: var(--ink); }
+  .fl-head { display: flex; align-items: baseline; gap: 10px; }
+  .fl-head .codes { font: 800 24px/1 var(--display); letter-spacing: .01em; }
+  .fl-head .price { margin-left: auto; font: 700 18px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .fl .sub { font-size: 14px; color: var(--ink-2); }
+  .steps { list-style: none; margin: 10px 0 0; padding: 0; }
+  .steps li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
+  .steps .ic2 { width: 30px; height: 30px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+  .steps .ic2 svg { width: 16px; height: 16px; }
+  .steps .r { color: var(--ink-2); text-align: right; white-space: nowrap; }
+  .fare-links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .fare-links a { height: 34px; line-height: 34px; padding: 0 12px; border-radius: 17px; background: var(--surface); color: var(--ink);
+                  font-size: 14px; font-weight: 600; text-decoration: none; }
+  .date-pill { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 18px; background: var(--surface);
+               font-size: 14px; font-weight: 500; margin-top: 12px; }
+  .date-pill input { border: 0; background: transparent; font: inherit; color: inherit; }
+  .airline { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; font-weight: 600; }
+  .airline img { width: 22px; height: 22px; border-radius: 4px; background: #fff; }
+  .door { margin-top: 6px; font-size: 14px; }
+  .door b { font-weight: 700; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--orange-wash); color: var(--ink); }
+  .plane { width: 30px; height: 30px; border-radius: 50%; background: #000; color: #fff; display: grid; place-items: center;
+           font: 700 11px/1 var(--display); border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+
+  /* Modal (booking, account, save place) */
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / .45); display: none; align-items: flex-end; justify-content: center; }
+  .modal.open { display: flex; }
+  .modal > div { width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; background: var(--bg);
+                 border-radius: 16px 16px 0 0; padding: 22px 20px calc(20px + env(safe-area-inset-bottom)); }
+  .modal h3 { font: 700 26px/1.1 var(--display); margin: 0 0 6px; }
+  .modal h4 { font: 700 18px/1.2 var(--display); margin: 20px 0 6px; }
+  .modal .x { float: right; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+  .modal form { display: grid; gap: 12px; margin-top: 14px; }
+  .tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 10px; padding: 4px; margin-top: 12px; }
+  .tabs button { flex: 1; height: 36px; border: 0; border-radius: 8px; background: transparent; font-weight: 600; }
+  .tabs button[aria-selected=true] { background: var(--bg); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+  .labels { display: flex; gap: 8px; flex-wrap: wrap; }
+  .labels button { height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: var(--surface); font-weight: 600; }
+  .labels button.on { background: var(--ink); color: var(--bg); }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .list .grow { flex: 1; min-width: 0; }
+  .list .grow b { display: block; font-weight: 600; }
+  .list .grow span { font-size: 14px; color: var(--ink-2); }
+  .icon-btn { width: 34px; height: 34px; flex: none; border: 0; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
+  .text-btn { border: 0; background: none; padding: 0; color: var(--focus); font-weight: 600; }
+  @media (min-width: 900px) { .modal { align-items: center; } .modal > div { border-radius: 16px; } }
+
+  /* Phones: bottom sheet with a drag handle */
+  @media (max-width: 899px) {
+    .panel { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: var(--sheet); border-radius: 18px 18px 0 0;
+             transition: height .25s cubic-bezier(.3,.7,.2,1); }
+    .panel.dragging { transition: none; }
+    .handle { display: block; flex: none; height: 22px; touch-action: none; cursor: grab; position: relative; }
+    .handle::after { content: ""; position: absolute; left: 50%; top: 9px; width: 40px; height: 5px; margin-left: -20px;
+                     border-radius: 3px; background: var(--surface-2); }
+    .scroll { padding-top: 4px; }
+    .brand h1 { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .draw .seg .bar, .loading .skel i { animation: none; }
+    .panel { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+
+<section class="panel" id="panel" aria-label="Trip planner">
+  <div class="handle" id="handle" role="button" tabindex="0" aria-label="Resize panel"></div>
+  <div class="scroll" id="scroll">
+
+    <!-- Plan view -->
+    <div id="view-plan">
+      <div class="brand">
+        <svg width="40" height="14" viewBox="0 0 40 14" aria-hidden="true">
+          <line x1="7" y1="7" x2="20" y2="7" stroke="var(--m-walk)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.1 5"/>
+          <line x1="20" y1="7" x2="33" y2="7" stroke="var(--orange)" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="5" cy="7" r="4.5" fill="var(--ink)"/>
+          <circle cx="20" cy="7" r="3.5" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/>
+          <rect x="31" y="3" width="8" height="8" rx="1.5" fill="var(--ink)"/>
+        </svg>
+        <h1>Hopper</h1>
+        <button class="acct-btn out" id="acct-btn" type="button">Sign in</button>
+      </div>
+
+      <div id="trip-form">
+        <div class="route">
+          <span class="o" aria-hidden="true"></span><span class="d" aria-hidden="true"></span>
+          <input id="from-input" class="place-input" data-field="from" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Pickup location" aria-label="Pickup location" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+          <div class="sep"></div>
+          <input id="to-input" class="place-input" data-field="to" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Where to?" aria-label="Where to" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+          <button class="swap" id="swap" type="button" aria-label="Swap pickup and destination">
+            <svg class="i" viewBox="0 0 24 24"><path d="M7 4v16M7 4 4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="crawl-form-route" hidden>
+        <div class="route" style="margin-top:2px">
+          <span class="o" aria-hidden="true"></span><span class="d" aria-hidden="true"></span>
+          <input id="cstart-input" class="place-input" data-field="cstart" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Start the crawl near…" aria-label="Start the crawl near" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+          <div class="sep"></div>
+          <input id="cend-input" class="place-input" data-field="cend" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Ride home to (optional)" aria-label="Ride home to" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+        </div>
+      </div>
+
+      <ul class="suggest" id="suggest" role="listbox" aria-label="Suggestions" hidden></ul>
+
+      <div id="plan-body">
+        <div class="shortcuts" id="shortcuts" hidden></div>
+        <div class="ask" id="ask-wrap">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+          <input id="q" type="text" autocomplete="off" aria-label="Describe your trip" placeholder="Or describe it: late, Gare du Nord to the Louvre">
+        </div>
+
+        <div class="modes" id="modes" role="radiogroup" aria-label="Mode">
+          <button class="mode active" data-mode="hustle" role="radio" aria-checked="true">
+            <svg class="i" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>Hustle <small>Fastest</small></button>
+          <button class="mode" data-mode="broke" role="radio" aria-checked="false">
+            <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.4-.9-1.5-1.5-2.8-1.5-1.6 0-2.8.8-2.8 2s1.1 1.7 2.8 2.1 2.8.9 2.8 2.2-1.2 2.1-2.8 2.1c-1.4 0-2.5-.6-2.9-1.6M12 6v1.7M12 16.1V18"/></svg>Broke <small>Budget</small></button>
+          <button class="mode" data-mode="barcrawl" role="radio" aria-checked="false">
+            <svg class="i" viewBox="0 0 24 24"><path d="M4 4h16l-8 9.5zM12 13.5V20M8 20h8"/></svg>Bar Crawl <small>Cool bars</small></button>
+          <button class="mode" data-mode="burn" role="radio" aria-checked="false">
+            <svg class="i" viewBox="0 0 24 24"><path d="M12 2.5c.6 3 4.5 5 4.5 10a4.5 4.5 0 0 1-9 0c0-2.4 1.2-3.8 2.3-4.8.1 2 .9 3.1 2.2 3.4-.4-3.2-.6-5.8 0-8.6z"/></svg>Burn <small>Transit + workout</small></button>
+        </div>
+
+        <div id="trip-pills" class="pills">
+          <label class="pill"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hour-label">Leave now</span>
+            <select id="hour" aria-label="Leave at"></select></label>
+          <label class="pill"><svg class="i" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.6-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/></svg><span id="weather-label">Live weather</span>
+            <select id="weather" aria-label="Weather"><option value="live">Live weather</option><option value="clear">Clear</option><option value="fog">Fog</option><option value="rain">Rain</option></select></label>
+          <label class="pill">$ <input id="budget" type="number" min="0" placeholder="Any" aria-label="Budget in dollars"></label>
+          <label class="pill toggle"><input id="event" type="checkbox">Game night</label>
+          <label class="pill toggle"><input id="steep" type="checkbox">No steep hills</label>
+        </div>
+
+        <div id="crawl-form" hidden>
+          <div class="pills">
+            <label class="pill"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="c-hour-label">8 pm</span>
+              <select id="c-hour" aria-label="Start at"></select></label>
+            <label class="pill"><span id="c-stops-label">3 bars</span>
+              <select id="c-stops" aria-label="Number of bars"><option value="2">2 bars</option><option value="3" selected>3 bars</option><option value="4">4 bars</option><option value="5">5 bars</option></select></label>
+            <label class="pill"><span id="c-mins-label">45 min each</span>
+              <select id="c-mins" aria-label="Minutes at each bar"><option value="30">30 min each</option><option value="45" selected>45 min each</option><option value="60">60 min each</option><option value="90">90 min each</option></select></label>
+            <label class="pill toggle"><input id="c-age" type="checkbox">I'm 21+</label>
+          </div>
+          <div class="vibes" id="vibes" aria-label="Vibe"></div>
+          <p class="fine">Bars come from OpenStreetMap, which has no ratings. Picks favor SF landmarks, well-documented bars, and your vibe. Drink responsibly, and never drive.</p>
+        </div>
+
+        <div id="error" class="error" role="alert"></div>
+        <div id="notice" class="notice" role="status" hidden></div>
+
+        <div id="recent-block" hidden>
+          <h3 class="section-title" id="recent-title">Recent</h3>
+          <ul class="places" id="recent"></ul>
+        </div>
+        <div id="explore">
+          <h3 class="section-title">Explore another city</h3>
+          <div class="cities" id="cities"></div>
+        </div>
+        <div id="popular">
+          <h3 class="section-title">Popular in San Francisco</h3>
+          <ul class="places" id="places"></ul>
+        </div>
+
+        <details class="more" id="advanced">
+          <summary>Fine-tune and profile</summary>
+          <div class="sliders">
+            <div class="slider"><span>Time</span><input id="w-time" type="range" min="0" max="3" step="0.5" value="3" aria-label="Time weight"><b id="v-time">3</b></div>
+            <div class="slider"><span>Cost</span><input id="w-cost" type="range" min="0" max="3" step="0.5" value="0.5" aria-label="Cost weight"><b id="v-cost">0.5</b></div>
+            <div class="slider"><span>Health</span><input id="w-health" type="range" min="0" max="3" step="0.5" value="0" aria-label="Health weight"><b id="v-health">0</b></div>
+          </div>
+          <div class="grid3">
+            <div class="field"><label for="kg">Weight (kg)</label><input id="kg" type="number" value="75" min="30" max="200"></div>
+            <div class="field"><label for="leg">Longest walk</label><input id="leg" type="number" value="2.0" step="0.1" min="0.1"></div>
+            <div class="field"><label for="total">Total walk</label><input id="total" type="number" value="3.0" step="0.1" min="0.1"></div>
+          </div>
+          <p class="fine">Moving a slider leaves the Mode and uses your own weights. Distances are in miles.</p>
+        </details>
+      </div>
+    </div>
+
+    <!-- Results view -->
+    <div id="view-results" hidden>
+      <div class="rhead">
+        <button class="back" id="back" type="button" aria-label="Back to planning">
+          <svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div><h2 id="r-title"></h2><p id="r-sub"></p></div>
+      </div>
+      <div class="modes" id="modes-r" role="radiogroup" aria-label="Mode"></div>
+      <div class="conditions" id="conditions"></div>
+      <div id="r-notice" class="notice" role="status" hidden></div>
+      <div class="opts" id="results" aria-live="polite"></div>
+      <details class="more" id="trace-box" hidden><summary>How the agents planned this</summary><div id="trace"></div></details>
+      <details class="more" id="rej-box" hidden><summary>Trips the checker ruled out</summary><div id="rejected"></div></details>
+      <p class="fine">Ride prices are simulated estimates, not Uber or Lyft quotes. Transit and bike fares are approximate (outside the US they're rough USD estimates), calories are estimates, and booking is a demo.</p>
+    </div>
+  </div>
+
+  <div class="cta-bar"><button class="cta" id="cta">See trips</button></div>
+</section>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div id="modal-body"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"
+        integrity="sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"
+        integrity="sha384-tXYNKOHx4T02jMP7YYCtBxPIv1B5gaA5mcVPBzqMp6d7VzWzxJgI2aWF/nJLrQdS" crossorigin="anonymous"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const MODE_NAMES = { walk: "Walk", ride: "Ride", muni: "Muni", bart: "BART", cable: "Cable car", bike: "Bike", ebike: "E-bike",
+                     bus: "Bus", tram: "Tram", metro: "Metro", rail: "Train", ferry: "Ferry" };
+const MODE_LABELS = { hustle: "Hustle", broke: "Broke", burn: "Burn", barcrawl: "Bar Crawl", custom: "Custom" };
+const ICONS = {
+  walk: '<circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2.2-6.5 2.8 2.5V21M8.5 12.5l1.8-4 3.4.6 2.3 3.4M12.2 14.5 11 9"/>',
+  ride: '<path d="M5 17v-5l2-5.5h10L19 12v5M5 17h14M7.5 17v2M16.5 17v2M5 12h14"/><circle cx="8" cy="14.5" r=".6"/><circle cx="16" cy="14.5" r=".6"/>',
+  muni: '<rect x="6" y="4" width="12" height="13" rx="2.5"/><path d="M6 11h12M9 20l-1 2M15 20l1 2M10 2h4M12 2v2"/>',
+  bart: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 10h14M9 21l1-4M15 21l-1-4M8.5 13.5h.01M15.5 13.5h.01"/>',
+  cable: '<path d="M3 3l18 3M12 4.5V8M5.5 8h13l1 9h-15zM8 17v2.5M16 17v2.5M9 11h6"/>',
+  bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-7h5l3 7M10 9 9 6.5H7M15 9l1-2.5h1.5"/>',
+  ebike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-7h5l3 7M13 5l-1.5 3h2l-1.5 3"/>',
+  bus: '<rect x="5" y="3" width="14" height="15" rx="2.5"/><path d="M5 11h14M8 21v-3M16 21v-3M8.5 14.5h.01M15.5 14.5h.01"/>',
+  tram: '<rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M6 12h12M9 21l1-3M15 21l-1-3M9 3h6M12 3v3"/>',
+  metro: '<circle cx="12" cy="12" r="9"/><path d="M8 16V8l4 5 4-5v8"/>',
+  rail: '<rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12M8 21l2-4M16 21l-2-4M9.5 14h.01M14.5 14h.01"/>',
+  ferry: '<path d="M3 18c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M5 15l1.5-5h11L19 15M9 10V6h6v4"/>',
+  plane: '<path d="M10.5 21l1.5-1v-5l7 2v-2l-7-4.5V5a1.5 1.5 0 0 0-3 0v5.5L2 15v2l7-2v5l1.5 1z" transform="translate(1.5 0)"/>',
+  seat: '<circle cx="12" cy="7" r="3"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>',
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  home: '<path d="M4 11 12 4l8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  here: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/>',
+  landmark: '<path d="M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10h18L12 4z"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+};
+const icon = (m) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[m] || ICONS.pin}</svg>`;
+const CITIES = [["San Francisco", 37.7749, -122.4194], ["New York", 40.758, -73.9855], ["London", 51.5072, -0.1276],
+  ["Paris", 48.8566, 2.3522], ["Berlin", 52.52, 13.405], ["Tokyo", 35.6812, 139.7671], ["Sydney", -33.8688, 151.2093]];
+const POPULAR = [
+  ["oracle_park", "Giants games and the waterfront"], ["ferry_building", "Food hall on the Embarcadero"],
+  ["sfo", "Flights, via BART or a ride"], ["golden_gate_park", "de Young and the park"],
+  ["chase_center", "Warriors and concerts"], ["coit_tower", "Telegraph Hill views"],
+];
+let COLORS = {}, PLACES = [], BYKEY = {}, plan = null, options = [], active = 0, layer = null, rerankTimer = null;
+let mode = "hustle", vibe = "any", view = "plan", crawlData = null, flightData = null, activeFlight = 0, rideChoice = null;
+let me = { user: null, places: [], trips: [] };
+const MODE_WEIGHTS = { hustle: [3, 0.5, 0], broke: [0.5, 3, 0.5], burn: [0.5, 0.5, 3] };
+const isPhone = () => matchMedia("(max-width: 899px)").matches;
+const dark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+
+// Selected places for each search field: {key?, name, address?, lat, lon}
+const sel = { from: null, to: null, cstart: null, cend: null };
+const INPUT = { from: "from-input", to: "to-input", cstart: "cstart-input", cend: "cend-input" };
+
+// Map — OpenFreeMap vector tiles (no key) rendered by MapLibre GL inside Leaflet: blue water,
+// green parks, highway shields, places, crisp labels at every zoom — the ride-app look.
+// No WebGL (old devices, some VMs) → the muted Esri raster canvas instead.
+const map = L.map("map", { zoomControl: false, attributionControl: true }).setView([37.773, -122.431], 13);
+L.control.zoom({ position: "topright" }).addTo(map);
+const VECTOR_ATTR = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>; routes OSRM / OpenRouteService; search Photon';
+const vectorStyle = () => `https://tiles.openfreemap.org/styles/${dark() ? "dark" : "liberty"}`;
+const hasWebGL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
+let basemap;
+if (hasWebGL && L.maplibreGL) {
+  basemap = L.maplibreGL({ style: vectorStyle(), attribution: VECTOR_ATTR, interactive: false }).addTo(map);
+  const ml = basemap.getMaplibreMap();
+  // Ride-app palette on top of OpenFreeMap "liberty": cool-gray land, white streets,
+  // blue-gray highways, so our coloured routes are the loudest thing on the map.
+  const tune = () => {
+    if (dark()) return;
+    const set = (id, prop, val) => { try { ml.setPaintProperty(id, prop, val); } catch { /* layer absent */ } };
+    set("background", "background-color", "#f2f3f5");
+    set("landuse_residential", "fill-opacity", 0);
+    for (const l of ml.getStyle().layers) {
+      if (l.type === "fill" && /^water/.test(l.id)) set(l.id, "fill-color", "#aad3f2");
+      if (l.type !== "line" || !/^(road|bridge|tunnel)_/.test(l.id) || /rail|path|pedestrian/.test(l.id)) continue;
+      const highway = /motorway|trunk_primary/.test(l.id), casing = /casing/.test(l.id);
+      set(l.id, "line-color", highway ? (casing ? "#8ea2d8" : "#b4c3ee") : (casing ? "#dcdfe4" : "#ffffff"));
+    }
+  };
+  ml.on("style.load", tune);
+  if (ml.isStyleLoaded()) tune();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => ml.setStyle(vectorStyle()));
+} else {
+  const esri = (layer) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${layer}/MapServer/tile/{z}/{y}/{x}`;
+  const canvasLayers = () => dark() ? ["World_Dark_Gray_Base", "World_Dark_Gray_Reference"] : ["World_Light_Gray_Base", "World_Light_Gray_Reference"];
+  const [b, r] = canvasLayers();
+  basemap = L.tileLayer(esri(b), { maxZoom: 19, maxNativeZoom: 16,
+    attribution: 'Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors; routes OSRM / OpenRouteService; search Photon' }).addTo(map);
+  const labels = L.tileLayer(esri(r), { maxZoom: 19, maxNativeZoom: 16, pane: "overlayPane" }).addTo(map);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    const [b2, r2] = canvasLayers(); basemap.setUrl(esri(b2)); labels.setUrl(esri(r2));
+  });
+}
+
+// Where search and geocoding are biased: set instantly when a city is picked, then follows the map.
+let searchCenter = [37.7749, -122.4194];
+map.on("moveend", () => { const c = map.getCenter(); searchCenter = [c.lat, c.lng]; });
+const legColor = (l) => l.color || `var(--m-${l.mode})`;
+function dist(mi, units) {
+  return (units || plan?.units || "mi") === "km" ? `${(mi * 1.609).toFixed(1)} km` : `${(+mi).toFixed(mi < 10 ? 2 : 1)} mi`;
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function hourLabel(h) { return h === 0 ? "12 am" : h < 12 ? `${h} am` : h === 12 ? "12 pm" : `${h - 12} pm`; }
+function weights() { return { time: +$("w-time").value, cost: +$("w-cost").value, health: +$("w-health").value }; }
+function mins(m) { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)} hr ${m % 60} min` : `${m} min`; }
+// Times are in the trip city's own time zone (SF, Paris, Tokyo…), whatever the viewer's zone.
+function minutesNowIn(tz) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz || "America/Los_Angeles", hour: "numeric",
+    minute: "numeric", hourCycle: "h23" }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return (+p.hour) * 60 + (+p.minute);
+}
+function clockFromMinutes(m) {
+  m = Math.round(m) % 1440; const h = Math.floor(m / 60), mm = m % 60;
+  return `${h % 12 || 12}:${String(mm).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+}
+function arrival(totalMin) {
+  const rq = plan.request;
+  return clockFromMinutes((rq.leave_now ? minutesNowIn(rq.tz) : rq.hour * 60) + totalMin);
+}
+const cityOf = (tz) => (tz || "").split("/").pop().replace(/_/g, " ");
+async function api(path, opts = {}) {
+  const res = await fetch(path, { credentials: "same-origin", ...opts,
+    headers: { ...(opts.body ? { "Content-Type": "application/json" } : {}), ...(opts.headers || {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong. Try again."), { status: res.status });
+  return data;
+}
+const landmarkPlace = (k) => BYKEY[k] && { key: k, name: BYKEY[k].name, lat: BYKEY[k].lat, lon: BYKEY[k].lon, address: "Landmark" };
+
+// Recent searches (this browser only; works signed out).
+const RECENT_KEY = "hopper.recent.v1";
+function readRecent() { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; } }
+function pushRecent(from, to) {
+  try {
+    const list = readRecent().filter(r => !(r.to.name === to.name && r.from.name === from.name));
+    list.unshift({ from, to });
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 6)));
+  } catch { /* storage off: fine */ }
+}
+
+async function init() {
+  const r = await api("api/places");
+  PLACES = r.places; COLORS = r.colors;
+  for (const p of PLACES) BYKEY[p.key] = p;
+  setPlace("from", landmarkPlace("ferry_building")); setPlace("to", landmarkPlace("coit_tower"));
+  setPlace("cstart", landmarkPlace("washington_sq")); setPlace("cend", landmarkPlace("hayes_valley"));
+  $("hour").innerHTML = `<option value="now">Leave now</option>` +
+    [...Array(24).keys()].map(h => `<option value="${h}">Leave at ${hourLabel(h)}</option>`).join("");
+  $("hour").value = "now";
+  $("cities").innerHTML = CITIES.map(([n], i) => `<button type="button" data-city="${i}" aria-pressed="${i === 0}">${esc(n)}</button>`).join("");
+  $("c-hour").innerHTML = [...Array(24).keys()].map(h => `<option value="${h}">${hourLabel(h)}</option>`).join(""); $("c-hour").value = 20;
+  $("vibes").innerHTML = Object.entries(r.vibes).map(([k, label]) =>
+    `<button type="button" data-vibe="${k}" aria-pressed="${k === vibe}" class="${k === vibe ? "on" : ""}">${esc(label)}</button>`).join("");
+  $("places").innerHTML = POPULAR.filter(([k]) => BYKEY[k]).map(([k, s]) => `<li><button type="button" data-place="${k}">
+      <span class="ic">${icon("pin")}</span><span><b>${esc(BYKEY[k].name)}</b><span class="s">${esc(s)}</span></span></button></li>`).join("");
+  $("modes-r").innerHTML = $("modes").innerHTML;
+  syncPills(); setSheet(isPhone() ? "mid" : null);
+  await refreshMe();
+}
+
+function syncPills() {
+  $("hour-label").textContent = $("hour").selectedOptions[0].textContent;
+  $("weather-label").textContent = $("weather").selectedOptions[0].textContent;
+  $("c-hour-label").textContent = `Start ${hourLabel(+$("c-hour").value)}`;
+  $("c-stops-label").textContent = $("c-stops").selectedOptions[0].textContent;
+  $("c-mins-label").textContent = $("c-mins").selectedOptions[0].textContent;
+}
+
+// ── Place search (combobox) ──────────────────────────────────────────────────
+let activeField = null, suggestions = [], hi = -1, geoTimer = null, geoSeq = 0;
+function setPlace(field, place) {
+  sel[field] = place;
+  $(INPUT[field]).value = place ? place.name : "";
+}
+function placeParams(prefix, place) {
+  if (!place) return {};
+  if (place.key && !place.key.startsWith("geo:")) return { [prefix]: place.key };
+  return { [`${prefix}_place`]: { name: place.name, lat: place.lat, lon: place.lon } };
+}
+function savedAsSuggestions(q) {
+  return me.places.filter(p => !q || (p.label + " " + p.name).toLowerCase().includes(q))
+    .map(p => ({ kind: p.label === "Home" ? "home" : p.label === "Work" ? "work" : "star", name: p.label === "Home" || p.label === "Work" ? p.label : p.name,
+                 address: p.label === "Home" || p.label === "Work" ? p.name : p.label, lat: p.lat, lon: p.lon, placeName: p.name }));
+}
+function buildSuggestions(q) {
+  const items = [];
+  if (!q) {
+    items.push({ kind: "here", name: "Use my current location", address: "Works anywhere" });
+    const saved = savedAsSuggestions("");
+    if (saved.length) items.push({ group: "Saved places" }, ...saved);
+    const rec = (me.user ? me.trips.map(t => t.destination) : readRecent().map(r => r.to))
+      .filter((p, i, a) => a.findIndex(x => x.name === p.name) === i).slice(0, 4);
+    if (rec.length) items.push({ group: "Recent" }, ...rec.map(p => ({ kind: "clock", name: p.name, address: p.address || "", lat: p.lat, lon: p.lon, key: p.key })));
+    return items;
+  }
+  const saved = savedAsSuggestions(q);
+  if (saved.length) items.push({ group: "Saved places" }, ...saved);
+  const lm = PLACES.filter(p => p.name.toLowerCase().includes(q)).slice(0, 4)
+    .map(p => ({ kind: "landmark", name: p.name, address: "Landmark", key: p.key, lat: p.lat, lon: p.lon }));
+  if (lm.length) items.push({ group: "Landmarks" }, ...lm);
+  return items;
+}
+function renderSuggest(extra = null, note = "") {
+  const box = $("suggest");
+  let items = suggestions;
+  if (extra && extra.length) items = [...items, { group: "Addresses" }, ...extra];
+  suggestions = items;
+  let n = -1;
+  box.innerHTML = items.map(it => {
+    if (it.group) return `<li class="grp" role="presentation">${esc(it.group)}</li>`;
+    n++;
+    return `<li role="option" id="opt-${n}" data-n="${n}" aria-selected="${n === hi}"><span class="ic">${icon(it.kind)}</span>
+      <span><b>${esc(it.name)}</b>${it.address ? `<span class="s">${esc(it.address)}</span>` : ""}</span></li>`;
+  }).join("") + (note ? `<li class="empty" role="presentation">${esc(note)}</li>` : "");
+  const input = $(INPUT[activeField]);
+  input.setAttribute("aria-expanded", "true");
+  input.setAttribute("aria-activedescendant", hi >= 0 ? `opt-${hi}` : "");
+}
+const pickable = () => suggestions.filter(s => !s.group);
+function openSuggest(field) {
+  activeField = field; hi = -1;
+  $("suggest").hidden = false; $("plan-body").hidden = true;
+  updateSuggest();
+  if (isPhone()) setSheet("full");
+}
+function closeSuggest() {
+  if (!activeField) return;
+  $(INPUT[activeField]).setAttribute("aria-expanded", "false");
+  // Restore the field's chosen place if the rider typed without picking.
+  if (sel[activeField]) $(INPUT[activeField]).value = sel[activeField].name;
+  activeField = null; $("suggest").hidden = true; $("plan-body").hidden = false;
+}
+function updateSuggest() {
+  const raw = $(INPUT[activeField]).value.trim();
+  const q = (sel[activeField] && raw === sel[activeField].name) ? "" : raw.toLowerCase();
+  suggestions = buildSuggestions(q); hi = -1;
+  renderSuggest(null, q.length >= 3 ? "Searching addresses…" : "");
+  clearTimeout(geoTimer);
+  if (q.length < 3) return;
+  const seq = ++geoSeq, field = activeField;
+  geoTimer = setTimeout(async () => {
+    try {
+      const r = await api(`api/geocode?q=${encodeURIComponent(raw)}&lat=${searchCenter[0].toFixed(3)}&lon=${searchCenter[1].toFixed(3)}`);
+      if (seq !== geoSeq || field !== activeField) return;
+      suggestions = buildSuggestions(q);
+      const adds = r.results.map(x => ({ kind: "pin", name: x.name, address: x.address, lat: x.lat, lon: x.lon, key: x.key }));
+      renderSuggest(adds, adds.length ? "" : "No places match. Try a street and number, or add the city.");
+    } catch (e) {
+      if (seq === geoSeq) renderSuggest(null, "Address search is unavailable right now. Try a landmark.");
+    }
+  }, 250);
+}
+async function pick(item) {
+  const field = activeField;
+  if (!item || !field) return;
+  if (item.kind === "here") return useMyLocation(field);
+  const place = { key: item.key, name: item.placeName || item.name, address: item.address, lat: item.lat, lon: item.lon };
+  setPlace(field, place); closeSuggest();
+  if (field === "from") { $("to-input").focus(); return; }
+  if (field === "to") { $("q").value = ""; planTrip(); }
+  if (field === "cstart") $("cend-input").focus();
+}
+function useMyLocation(field) {
+  if (!navigator.geolocation) { renderSuggest(null, "Location isn't available in this browser."); return; }
+  renderSuggest(null, "Finding you…");
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const p = await api(`api/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+      activeField = field; await pick({ kind: "pin", name: p.name, address: p.address, lat: p.lat, lon: p.lon, key: p.key });
+    } catch (e) { renderSuggest(null, e.message); }
+  }, () => renderSuggest(null, "Location permission was declined. Search for your pickup instead."), { timeout: 8000 });
+}
+for (const [field, id] of Object.entries(INPUT)) {
+  const input = $(id);
+  input.addEventListener("focus", () => { input.select(); openSuggest(field); });
+  input.addEventListener("input", () => { if (activeField !== field) openSuggest(field); else updateSuggest(); });
+  input.addEventListener("keydown", e => {
+    const list = pickable();
+    if (e.key === "ArrowDown") { e.preventDefault(); hi = Math.min(hi + 1, list.length - 1); renderSuggest(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); hi = Math.max(hi - 1, -1); renderSuggest(); }
+    else if (e.key === "Enter") { e.preventDefault(); pick(list[Math.max(hi, 0)]); }
+    else if (e.key === "Escape") { closeSuggest(); input.blur(); }
+  });
+}
+$("suggest").addEventListener("mousedown", e => e.preventDefault());    // keep focus while clicking
+$("suggest").addEventListener("click", e => {
+  const li = e.target.closest("li[role=option]");
+  if (li) pick(pickable()[+li.dataset.n]);
+});
+document.addEventListener("focusin", e => {
+  if (activeField && !e.target.closest(".route") && !e.target.closest("#suggest")) closeSuggest();
+});
+
+// ── Account ──────────────────────────────────────────────────────────────────
+async function refreshMe(data) {
+  try { me = data || await api("api/me"); } catch { me = { user: null, places: [], trips: [] }; }
+  const b = $("acct-btn");
+  if (me.user) {
+    b.classList.remove("out");
+    b.innerHTML = `<span class="av" aria-hidden="true">${esc(me.user.name[0].toUpperCase())}</span>${esc(me.user.name.split(" ")[0])}`;
+    b.setAttribute("aria-label", `Account: ${me.user.name}`);
+    if (me.user.prefs?.weight_kg) $("kg").value = me.user.prefs.weight_kg;
+  } else {
+    b.classList.add("out"); b.textContent = "Sign in"; b.setAttribute("aria-label", "Sign in");
+  }
+  renderShortcuts(); renderRecent();
+}
+function renderShortcuts() {
+  const box = $("shortcuts");
+  if (!me.user) { box.hidden = true; return; }
+  const has = (l) => me.places.find(p => p.label === l);
+  const chips = ["Home", "Work"].map(l => has(l)
+      ? `<button class="shortcut" data-go="${has(l).id}">${icon(l.toLowerCase())}${l}<span>${esc(has(l).name)}</span></button>`
+      : `<button class="shortcut" data-set="${l}">${icon(l.toLowerCase())}Set ${l.toLowerCase()}</button>`)
+    .concat(me.places.filter(p => p.label !== "Home" && p.label !== "Work")
+      .map(p => `<button class="shortcut" data-go="${p.id}">${icon("star")}${esc(p.label)}</button>`));
+  if (sel.to) chips.push(`<button class="shortcut" data-save="1">${icon("star")}Save destination</button>`);
+  box.innerHTML = chips.join(""); box.hidden = false;
+}
+function renderRecent() {
+  const items = me.user
+    ? me.trips.slice(0, 5).map(t => ({ from: t.origin, to: t.destination, sub: `${new Date(t.created).toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${t.summary.label || MODE_LABELS[t.mode] || "Trip"}` }))
+    : readRecent().slice(0, 5).map(r => ({ ...r, sub: `From ${r.from.name}` }));
+  $("recent-block").hidden = !items.length;
+  $("recent-title").textContent = me.user ? "Your trips" : "Recent";
+  $("recent").innerHTML = items.map((t, i) => `<li><button type="button" data-recent="${i}">
+      <span class="ic">${icon("clock")}</span><span><b>${esc(t.to.name)}</b><span class="s">${esc(t.sub)}</span></span></button></li>`).join("");
+  $("recent").dataset.items = JSON.stringify(items);
+}
+
+function openModal(html) {
+  $("modal-body").innerHTML = html; $("modal").classList.add("open");
+  ($("modal-body").querySelector("[autofocus]") || $("modal-body").querySelector("input, button"))?.focus();
+}
+function closeModal() { $("modal").classList.remove("open"); $("cta").focus(); }
+const closeBtn = `<button class="x" type="button" data-close aria-label="Close">${icon("x")}</button>`;
+
+function openAuth(tab = "signin", message = "") {
+  const up = tab === "signup";
+  openModal(`${closeBtn}<h3 id="modal-title">${up ? "Create your account" : "Sign in"}</h3>
+    <p class="fine" style="margin-top:0">${esc(message || "Save Home and Work, and keep your trip history.")}</p>
+    <div class="tabs" role="tablist"><button type="button" role="tab" data-tab="signin" aria-selected="${!up}">Sign in</button>
+      <button type="button" role="tab" data-tab="signup" aria-selected="${up}">Create account</button></div>
+    <form id="auth-form" novalidate>
+      ${up ? `<div class="field"><label for="a-name">Name</label><input id="a-name" autocomplete="name" required autofocus></div>` : ""}
+      <div class="field"><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" required ${up ? "" : "autofocus"}></div>
+      <div class="field"><label for="a-pass">Password</label><input id="a-pass" type="password" autocomplete="${up ? "new-password" : "current-password"}" minlength="8" required>
+        ${up ? `<p class="fine" style="margin-top:4px">At least 8 characters.</p>` : ""}</div>
+      <div class="error" id="a-err" role="alert"></div>
+      <button class="cta" type="submit">${up ? "Create account" : "Sign in"}</button>
+    </form>`);
+  $("auth-form").onsubmit = async e => {
+    e.preventDefault();
+    const body = { email: $("a-email").value, password: $("a-pass").value, ...(up ? { name: $("a-name").value } : {}) };
+    try {
+      await refreshMe(await api(up ? "api/auth/signup" : "api/auth/login", { method: "POST", body: JSON.stringify(body) }));
+      closeModal();
+    } catch (err) { $("a-err").textContent = err.message; }
+  };
+}
+
+function openAccount() {
+  if (!me.user) return openAuth();
+  const places = me.places.length ? me.places.map(p => `<li><span class="ic" style="width:36px;height:36px;border-radius:50%;background:var(--surface);display:grid;place-items:center">${icon(p.label === "Home" ? "home" : p.label === "Work" ? "work" : "star")}</span>
+      <span class="grow"><b>${esc(p.label)}</b><span>${esc(p.name)}</span></span>
+      <button class="icon-btn" type="button" data-del-place="${p.id}" aria-label="Remove ${esc(p.label)}">${icon("trash")}</button></li>`).join("")
+    : `<li><span class="grow"><span>No saved places yet. Pick a destination, then tap “Save destination”.</span></span></li>`;
+  const trips = me.trips.length ? me.trips.slice(0, 12).map((t, i) => `<li>
+      <span class="grow"><b>${esc(t.origin.name)} to ${esc(t.destination.name)}</b>
+      <span>${new Date(t.created).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, ${esc(t.summary.label || MODE_LABELS[t.mode] || "Trip")}${t.summary.cost ? `, $${t.summary.cost.toFixed(2)}` : ""}</span></span>
+      <button class="text-btn" type="button" data-again="${i}">Plan again</button></li>`).join("")
+    : `<li><span class="grow"><span>Trips you book show up here.</span></span></li>`;
+  openModal(`${closeBtn}<h3 id="modal-title">${esc(me.user.name)}</h3><p class="fine" style="margin-top:0">${esc(me.user.email)}</p>
+    <h4>Saved places</h4><ul class="list">${places}</ul>
+    <h4>Your trips</h4><ul class="list">${trips}</ul>
+    ${me.trips.length ? `<p><button class="text-btn" type="button" data-clear-trips>Clear trip history</button></p>` : ""}
+    <button class="cta secondary" type="button" data-signout style="margin-top:16px">Sign out</button>`);
+}
+
+function openSavePlace(prefLabel = "") {
+  if (!me.user) return openAuth("signin", "Sign in to save places.");
+  const place = sel.to;
+  if (!place) return;
+  let label = prefLabel || "Home";
+  openModal(`${closeBtn}<h3 id="modal-title">Save place</h3><p class="fine" style="margin-top:0">${esc(place.name)}${place.address ? `, ${esc(place.address)}` : ""}</p>
+    <div class="labels" id="labels">${["Home", "Work", "Other"].map(l => `<button type="button" data-l="${l}" class="${l === label ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div class="field" id="custom-wrap" style="margin-top:12px" hidden><label for="custom-label">Name it</label><input id="custom-label" maxlength="30" placeholder="Gym, Mom's, Favorite bar"></div>
+    <div class="error" id="s-err" role="alert"></div>
+    <button class="cta" type="button" id="save-go" style="margin-top:14px">Save</button>`);
+  $("labels").onclick = e => {
+    const b = e.target.closest("[data-l]"); if (!b) return;
+    label = b.dataset.l; $("labels").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    $("custom-wrap").hidden = label !== "Other"; if (label === "Other") $("custom-label").focus();
+  };
+  $("save-go").onclick = async () => {
+    const finalLabel = label === "Other" ? ($("custom-label").value.trim() || "Saved") : label;
+    try {
+      await refreshMe(await api("api/me/places", { method: "POST", body: JSON.stringify({ label: finalLabel, name: place.name, lat: place.lat, lon: place.lon }) }));
+      closeModal();
+    } catch (e) { $("s-err").textContent = e.message; }
+  };
+}
+
+$("acct-btn").onclick = openAccount;
+$("modal-body").addEventListener("click", async e => {
+  const t = e.target.closest("button"); if (!t) return;
+  try {
+    if (t.hasAttribute("data-close")) closeModal();
+    else if (t.dataset.tab) openAuth(t.dataset.tab);
+    else if (t.hasAttribute("data-signout")) { await refreshMe(await api("api/auth/logout", { method: "POST", body: "{}" })); closeModal(); }
+    else if (t.dataset.delPlace) { await refreshMe(await api(`api/me/places/${t.dataset.delPlace}`, { method: "DELETE" })); openAccount(); }
+    else if (t.hasAttribute("data-clear-trips")) { await refreshMe(await api("api/me/trips", { method: "DELETE" })); openAccount(); }
+    else if (t.dataset.again) {
+      const trip = me.trips[+t.dataset.again]; closeModal();
+      if (mode === "barcrawl") setMode("hustle");
+      setPlace("from", trip.origin); setPlace("to", trip.destination); showView("plan"); planTrip();
+    }
+  } catch (err) { alert(err.message); }
+});
+$("shortcuts").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.save) return openSavePlace();
+  if (b.dataset.set) { openSuggest("to"); $("to-input").focus(); $("to-input").placeholder = `Search for your ${b.dataset.set.toLowerCase()} address`; return; }
+  const p = me.places.find(x => String(x.id) === b.dataset.go);
+  if (p) { setPlace("to", { name: p.name, lat: p.lat, lon: p.lon, address: p.label }); planTrip(); }
+});
+$("recent").addEventListener("click", e => {
+  const b = e.target.closest("[data-recent]"); if (!b) return;
+  const t = JSON.parse($("recent").dataset.items)[+b.dataset.recent];
+  setPlace("from", t.from); setPlace("to", t.to); planTrip();
+});
+
+// ── Bottom sheet (phones) ────────────────────────────────────────────────────
+const SHEET = { peek: 34, mid: 58, full: 88 };
+function setSheet(state) {
+  if (!isPhone()) return;
+  document.documentElement.style.setProperty("--sheet", SHEET[state] + "vh");
+  setTimeout(() => (layer ? frame() : map.invalidateSize()), 280);   // after the sheet transition
+}
+(() => {
+  const h = $("handle"), panel = $("panel");
+  let startY = 0, startH = 0;
+  h.addEventListener("pointerdown", e => {
+    startY = e.clientY; startH = panel.getBoundingClientRect().height;
+    panel.classList.add("dragging"); h.setPointerCapture(e.pointerId);
+  });
+  h.addEventListener("pointermove", e => {
+    if (!panel.classList.contains("dragging")) return;
+    const vh = Math.min(92, Math.max(20, (startH + startY - e.clientY) / innerHeight * 100));
+    document.documentElement.style.setProperty("--sheet", vh + "vh");
+  });
+  h.addEventListener("pointerup", () => {
+    panel.classList.remove("dragging");
+    const vh = panel.getBoundingClientRect().height / innerHeight * 100;
+    const snap = Object.entries(SHEET).sort((a, b) => Math.abs(a[1] - vh) - Math.abs(b[1] - vh))[0][0];
+    setSheet(snap);
+  });
+  h.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp") setSheet("full");
+    if (e.key === "ArrowDown") setSheet("peek");
+  });
+})();
+
+// ── Views ────────────────────────────────────────────────────────────────────
+function showView(v) {
+  view = v;
+  $("view-plan").hidden = v !== "plan";
+  $("view-results").hidden = v !== "results";
+  $("scroll").scrollTop = 0;
+  if (v === "plan") renderShortcuts();
+  updateCta();
+}
+
+function updateCta() {
+  const cta = $("cta");
+  cta.disabled = false;
+  if (view === "plan") { cta.textContent = mode === "barcrawl" ? "Plan my crawl" : "See trips"; return; }
+  if (flightData) {
+    const f = flightData.options[activeFlight];
+    cta.textContent = !f ? "Finding flights…" : f.offer ? `Select ${f.offer.airline} for ${money(f.offer.price, f.offer.currency)}`
+                                                        : `Check fares for ${f.dep.iata} to ${f.arr.iata}`;
+    cta.disabled = !f;
+    return;
+  }
+  if (crawlData) {
+    const r = crawlData.itinerary.ride_home;
+    cta.textContent = r ? `Book ride home for $${r.cost.toFixed(2)}` : "Start the crawl";
+    return;
+  }
+  const o = options[active];
+  if (!o) { cta.textContent = mode === "barcrawl" ? "Finding bars…" : "Finding trips…"; cta.disabled = true; return; }
+  const ride = o.legs.some(l => l.mode === "ride");
+  cta.textContent = o.cost === 0 ? "Start walking" : ride ? "Choose a ride" : `Go for $${o.cost.toFixed(2)}`;
+}
+
+function setMode(m, { rerank = true } = {}) {
+  mode = m;
+  document.querySelectorAll(".mode").forEach(b => {
+    const on = b.dataset.mode === m;
+    b.classList.toggle("active", on); b.setAttribute("aria-checked", on);
+  });
+  const crawl = m === "barcrawl";
+  $("trip-form").hidden = crawl; $("trip-pills").hidden = crawl; $("ask-wrap").hidden = crawl;
+  $("crawl-form").hidden = !crawl; $("crawl-form-route").hidden = !crawl;
+  $("popular").hidden = crawl; $("shortcuts").hidden = crawl || !me.user; $("recent-block").hidden = crawl || !$("recent").children.length;
+  $("error").textContent = "";
+  if (MODE_WEIGHTS[m]) {
+    const [t, c, h] = MODE_WEIGHTS[m];
+    $("w-time").value = t; $("w-cost").value = c; $("w-health").value = h;
+    for (const k of ["time", "cost", "health"]) $("v-" + k).textContent = $("w-" + k).value;
+  }
+  if (crawl) {
+    if (view === "results" && !crawlData) { showView("plan"); clearMap(); }
+    updateCta(); return;
+  }
+  if (view === "results" && crawlData) { showView("plan"); clearMap(); crawlData = null; }
+  if (rerank && plan && view === "results") rerankNow();
+  updateCta();
+}
+
+function clearMap() { if (layer) { map.removeLayer(layer); layer = null; } lastBounds = null; }
+function notice(id, text) { $(id).hidden = !text; $(id).textContent = text || ""; }
+
+function showLoading(title, sub, msg) {
+  crawlData = null; plan = null; options = []; flightData = null;
+  showView("results");
+  $("r-title").textContent = title; $("r-sub").textContent = sub;
+  $("conditions").innerHTML = ""; notice("r-notice", "");
+  $("trace-box").hidden = true; $("rej-box").hidden = true;
+  $("results").innerHTML = `<div class="loading">${'<div class="skel"><i></i><i></i><i></i></div>'.repeat(3)}</div><p class="loading-msg">${esc(msg)}</p>`;
+  updateCta(); setSheet("mid");
+}
+
+// ── Trips ────────────────────────────────────────────────────────────────────
+async function planTrip() {
+  $("error").textContent = "";
+  const query = $("q").value.trim();
+  if (!query && (!sel.from || !sel.to)) { $("error").textContent = "Search for a pickup and a destination."; return; }
+  const body = {
+    query, ...placeParams("origin", sel.from), ...placeParams("destination", sel.to),
+    hour: $("hour").value === "now" ? "now" : +$("hour").value, near: searchCenter,
+    weather: $("weather").value, event: $("event").checked,
+    avoid_steep: $("steep").checked, weight_kg: +$("kg").value,
+    max_walk_leg_mi: +$("leg").value, max_total_walk_mi: +$("total").value,
+    max_cost: $("budget").value === "" ? null : +$("budget").value, mode, weights: weights(),
+  };
+  showLoading(query ? "Reading your request" : `${sel.from.name} to ${sel.to.name}`,
+              "Comparing walking, rides, Muni, BART, and bikes", "Checking live arrivals, weather, and street routes…");
+  try {
+    const data = await api("api/plan", { method: "POST", body: JSON.stringify(body) });
+    if (data.redirect === "flights") { setPlace("from", data.origin); setPlace("to", data.destination); return planFlights(data); }
+    if (data.redirect === "barcrawl") {
+      showView("plan"); setMode("barcrawl");
+      if (data.start && BYKEY[data.start]) setPlace("cstart", landmarkPlace(data.start));
+      if (data.end && BYKEY[data.end]) setPlace("cend", landmarkPlace(data.end));
+      $("c-hour").value = data.hour; syncPills();
+      notice("notice", "Sounds like a night out. Confirm you're 21 or older, pick a vibe, and plan your crawl.");
+      return;
+    }
+    plan = data; options = data.options; active = 0;
+    const rq = data.request;
+    // Reflect what was understood (including geocoded addresses) back into the fields.
+    setPlace("from", { ...data.places.origin, address: sel.from?.name === data.places.origin.name ? sel.from.address : "" });
+    setPlace("to", { ...data.places.destination, address: sel.to?.name === data.places.destination.name ? sel.to.address : "" });
+    pushRecent(sel.from, sel.to);
+    $("hour").value = rq.leave_now ? "now" : rq.hour; $("weather").value = rq.weather; $("event").checked = rq.event; $("steep").checked = rq.avoid_steep;
+    if (rq.max_cost != null) $("budget").value = rq.max_cost;
+    if (rq.mode && rq.mode !== mode && MODE_WEIGHTS[rq.mode]) setMode(rq.mode, { rerank: false });
+    syncPills(); renderPlan(true); renderRecent();
+  } catch (e) {
+    showView("plan"); $("error").textContent = e.message;
+  }
+}
+
+async function rerankNow() {
+  if (!plan) return;
+  try {
+    const data = await api("api/rerank", { method: "POST", body: JSON.stringify({ plan_id: plan.plan_id, mode, weights: weights() }) });
+    options = data.options; active = 0; plan.notice = data.notice;
+    notice("r-notice", data.notice); renderOptions(true); drawTrip(); updateCta();
+  } catch (e) { notice("r-notice", e.message); }
+}
+
+function renderPlan(fresh) {
+  const s = plan.stats, lv = plan.live;
+  $("r-title").textContent = `${plan.origin_name} to ${plan.destination_name}`;
+  const zone = plan.request.region === "world" ? ` ${cityOf(plan.request.tz)} time` : "";
+  $("r-sub").textContent = `${plan.request.leave_now ? "Leaving now" : "Leaving at " + hourLabel(plan.request.hour) + zone}. ${s.candidates} trips compared.`;
+  const w = lv.weather;
+  const conds = [
+    [w ? `${w.temp_f}°F, ${w.summary.toLowerCase()}` : lv.condition === "rain" ? "Rain" : lv.condition === "fog" ? "Fog" : "Clear", !!w],
+    [lv.routes.startsWith("Street") ? "Street routes" : "Estimated routes", lv.routes.startsWith("Street")],
+    plan.request.region === "world"
+      ? [lv.world_transit === "ok" ? "Transitous transit" : "Transit unavailable", lv.world_transit === "ok"]
+      : [lv.transit === "511 live" ? "Live arrivals" : "Scheduled arrivals", lv.transit === "511 live"],
+  ];
+  if (/CityBikes live/.test(lv.bikes)) conds.push([lv.bikes.replace(/^CityBikes live \((.*)\)$/, "$1"), true]);
+  if (s.llm) conds.push(["Claude agents", true]);
+  $("conditions").innerHTML = conds.map(([t, on]) => `<span class="cond ${on ? "on" : ""}"><span class="dot"></span>${esc(t)}</span>`).join("");
+  notice("r-notice", plan.notice);
+  renderOptions(fresh); renderTrace(); drawTrip(); updateCta();
+}
+
+// "Best for Burn · Fastest · Cheapest" → title "Best for Burn", tag "Also fastest and cheapest"
+function splitLabel(label) {
+  const [first, ...rest] = label.split(" · ");
+  const extra = rest.map(s => s.toLowerCase());
+  const tag = !extra.length ? "" : extra.length > 1 ? `Also ${extra.slice(0, -1).join(", ")} and ${extra.at(-1)}` : `Also ${extra[0]}`;
+  return { title: first, tag };
+}
+
+function legDetail(l) {
+  const bits = [dist(l.distance_mi), mins(l.minutes) + (l.wait_min ? `, ${Math.round(l.wait_min)} min wait` : "")];
+  if (l.cost) bits.push(`$${l.cost.toFixed(2)}`);
+  if (l.surge > 1) bits.push(`${l.surge}× surge`);
+  if (l.mode === "walk" && l.grade > 0.04) bits.push("uphill");
+  return bits.join(", ");
+}
+
+function renderOptions(fresh) {
+  $("results").innerHTML = options.map((o, i) => {
+    const { title, tag } = splitLabel(o.label);
+    const modesUsed = o.legs.map(l => l.mode);
+    const glyphs = o.legs.filter(l => l.mode !== "walk" || o.legs.length === 1).concat(o.legs.length > 1 ? [] : []).slice(0, 2)
+      .map(l => `<span class="glyph" style="--c:${legColor(l)}">${icon(l.mode)}</span>`).join("")
+      + (o.legs.filter(l => l.mode !== "walk").length > 2 ? `<span class="glyph more">+${o.legs.filter(l => l.mode !== "walk").length - 2}</span>` : "");
+    const summary = [...new Set(o.legs.map(l => MODE_NAMES[l.mode]))].join(", then ").replace(/, then ([^,]+)$/, " and $1");
+    let detail = "";
+    if (i === active) {
+      const total = o.legs.reduce((a, l) => a + l.minutes + l.wait_min, 0) || 1;
+      const segs = o.legs.map(l => `<div class="seg ${l.mode}" style="--c:${legColor(l)};flex:${Math.max((l.minutes + l.wait_min) / total, 0.12)}">
+          <span class="lbl">${MODE_NAMES[l.mode]} ${Math.round(l.minutes + l.wait_min)}m</span><div class="bar"></div></div>`).join("");
+      const legs = o.legs.map(l => `<li style="--c:${legColor(l)}"><span class="ldot"></span>
+          <span><b>${MODE_NAMES[l.mode]}${l.line ? `, ${esc(l.line)}` : ""}</b> to ${esc(l.to_name)}<br>
+          <span class="x">${esc(legDetail(l))}${l.note ? `. ${esc(l.note)}` : ""}</span></span></li>`).join("");
+      detail = `<div class="detail">
+        <div class="line ${fresh ? "draw" : ""}" role="img" aria-label="${esc(summary)}">${segs}<span class="end-wrap"><span class="end"></span></span></div>
+        <ul class="legs">${legs}</ul>
+        ${o.why ? `<p class="why">${esc(o.why)}</p>` : ""}
+        ${o.flags.length ? `<div class="flags">${o.flags.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : ""}
+      </div>`;
+    }
+    return `<div class="opt ${i === active ? "active" : ""}">
+      <button class="opt-head" data-i="${i}" aria-pressed="${i === active}">
+        <span class="glyphs">${glyphs}</span>
+        <span><span class="opt-title">${esc(title)}</span><br>
+          <span class="opt-sub">Arrive <b>${arrival(o.total_min)}</b>, ${mins(o.total_min)}</span><br>
+          <span class="opt-sub">${esc(summary)}</span>${tag ? `<br><span class="tagline">${esc(tag)}</span>` : ""}</span>
+        <span class="opt-price">${o.cost === 0 ? "Free" : "$" + o.cost.toFixed(2)}<small>${o.kcal} kcal</small></span>
+      </button>${detail}</div>`;
+  }).join("");
+}
+
+function renderTrace() {
+  $("trace-box").hidden = false;
+  $("trace").innerHTML = `<table><tr><th>Agent</th><th>Ran as</th><th>ms</th><th>What it did</th></tr>` +
+    plan.trace.map(t => `<tr><td><b>${esc(t.agent)}</b></td><td>${esc(t.kind)}${t.model !== "—" ? `<br>${esc(t.model)}` : ""}</td><td>${t.ms}</td><td>${esc(t.detail)}${t.tokens ? ` (${t.tokens} tokens)` : ""}</td></tr>`).join("") + "</table>";
+  $("rej-box").hidden = !plan.rejected.length;
+  $("rejected").innerHTML = "<ul>" + plan.rejected.map(r => `<li>${esc(r.trip)}: ${esc(r.reasons.join("; "))}</li>`).join("") + "</ul>";
+}
+
+// ── Map drawing ──────────────────────────────────────────────────────────────
+const destIcon = () => L.divIcon({ className: "", html: '<div class="m-dest"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+const origIcon = () => L.divIcon({ className: "", html: '<div class="m-orig"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+
+function routeLine(path, m, color) {
+  const walk = m === "walk";
+  L.polyline(path, { color: dark() ? "#16191c" : "#ffffff", weight: walk ? 8 : 10, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(layer);
+  L.polyline(path, { color: color || (COLORS[m] === "#111827" && dark() ? "#f4f5f6" : COLORS[m]), weight: walk ? 5 : 6, lineCap: "round",
+    lineJoin: "round", dashArray: walk ? "1 9" : null }).addTo(layer);
+}
+
+let lastBounds = null;
+function frame(bounds) {
+  // Keep the route clear of the floating panel (desktop) or the bottom sheet (phones).
+  lastBounds = bounds || lastBounds;
+  if (!lastBounds) return;
+  map.invalidateSize();
+  const sheetPx = $("panel").getBoundingClientRect().height;
+  const pad = isPhone() ? { paddingTopLeft: [56, 48], paddingBottomRight: [56, sheetPx + 20] }
+                        : { paddingTopLeft: [460, 40], paddingBottomRight: [70, 40] };
+  map.fitBounds(lastBounds, { ...pad, maxZoom: 17 });
+}
+
+function drawTrip() {
+  clearMap();
+  const o = options[active];
+  if (!o) return;
+  layer = L.featureGroup().addTo(map);
+  for (const l of o.legs) routeLine(l.path, l.mode, l.color);
+  let t = 0;
+  o.legs.forEach((l, i) => {
+    if (i > 0) {
+      L.circleMarker(l.path[0], { radius: 6, color: COLORS[l.mode], weight: 3, fillColor: "#fff", fillOpacity: 1 })
+        .bindTooltip(`${MODE_NAMES[l.mode]} in ${Math.round(t)} min`, { permanent: true, direction: "top", offset: [0, -8], className: "eta" })
+        .addTo(layer);
+    }
+    t += l.minutes + l.wait_min;
+  });
+  L.marker(o.legs[0].path[0], { icon: origIcon() }).bindTooltip(plan.origin_name).addTo(layer);
+  L.marker(o.legs.at(-1).path.at(-1), { icon: destIcon() })
+    .bindTooltip(`Arrive ${arrival(o.total_min)}`, { permanent: true, direction: "top", offset: [0, -10], className: "eta" }).addTo(layer);
+  frame(layer.getBounds());
+}
+
+function selectOption(i) {
+  active = i; renderOptions(false); drawTrip(); updateCta();
+  document.querySelector(`.opt-head[data-i="${i}"]`)?.focus({ preventScroll: true });
+}
+
+// ── Bar Crawl ────────────────────────────────────────────────────────────────
+async function planCrawl() {
+  $("error").textContent = "";
+  if (!sel.cstart) { $("error").textContent = "Choose where the crawl starts."; return; }
+  if (!$("c-age").checked) { $("error").textContent = "Bar Crawl is for 21 and older. Turn on “I'm 21+” to continue."; return; }
+  const endText = $("cend-input").value.trim();
+  const body = { ...placeParams("start", sel.cstart), ...(endText && sel.cend ? placeParams("end", sel.cend) : {}),
+    hour: +$("c-hour").value, stops: +$("c-stops").value, minutes_per_stop: +$("c-mins").value, vibe,
+    weather: $("weather").value, event: $("event").checked, weight_kg: +$("kg").value, age_confirmed: true };
+  showLoading(`Bars near ${sel.cstart.name}`, "Picking a walkable route", "Scouting OpenStreetMap for bars that fit your vibe…");
+  try {
+    renderCrawl(await api("api/crawl", { method: "POST", body: JSON.stringify(body) }));
+  } catch (e) {
+    showView("plan"); $("error").textContent = e.message;
+  }
+}
+
+function renderCrawl(d) {
+  crawlData = d;
+  const it = d.itinerary, tot = it.totals;
+  $("r-title").textContent = `${it.stops.length} bars from ${d.start_name}`;
+  $("r-sub").textContent = `${mins(tot.minutes)}, done by ${tot.ends}. ${dist(tot.walk_mi, d.units)} of walking.`;
+  const w = d.weather;
+  $("conditions").innerHTML = [
+    [w ? `${w.temp_f}°F, ${w.summary.toLowerCase()}` : "Clear", !!w], [d.source, true], [`${d.bars_considered} bars considered`, true],
+  ].map(([t, on]) => `<span class="cond ${on ? "on" : ""}"><span class="dot"></span>${esc(t)}</span>`).join("");
+  const rows = [];
+  it.stops.forEach((s, i) => {
+    const hop = it.walks[i];
+    rows.push(`<div class="stop"><span class="n walk" aria-hidden="true"></span><div class="t" style="padding-top:4px">Walk ${dist(hop.distance_mi, d.units)}, about ${Math.round(hop.minutes)} min</div></div>`);
+    const site = /^https?:\/\//i.test(s.website) ? ` <a href="${esc(s.website)}" target="_blank" rel="noopener noreferrer">Website</a>` : "";
+    rows.push(`<div class="stop"><span class="n">${i + 1}</span><div><h3>${esc(s.name)}</h3>
+      <div class="t">${esc(s.arrive)} to ${esc(s.leave)}</div><div class="t">${esc(s.why)}</div>
+      <div class="t">Hours: ${esc(s.hours)}.${site}</div></div></div>`);
+  });
+  if (it.ride_home) {
+    const r = it.ride_home;
+    rows.push(`<div class="stop last"><span class="n ride" aria-hidden="true"></span><div><h3>Ride home to ${esc(r.to_name)}</h3>
+      <div class="t">${dist(r.distance_mi, d.units)}, ${Math.round(r.minutes)} min plus ${r.wait_min} min pickup. $${r.cost.toFixed(2)}, simulated.</div></div></div>`);
+  } else rows[rows.length - 1] = rows[rows.length - 1].replace('class="stop"', 'class="stop last"');
+  let html = `<div class="crawl">${rows.join("")}</div>`;
+  if (it.notes.length) html += `<div class="flags">${it.notes.map(n => `<span>${esc(n)}</span>`).join("")}</div>`;
+  if (d.alternate.length) html += `<p class="why">Another option: ${d.alternate.map(a => esc(a.name)).join(", then ")}.</p>`;
+  $("results").innerHTML = html;
+  clearMap(); layer = L.featureGroup().addTo(map);
+  for (const h of it.walks) routeLine(h.path, "walk");
+  if (it.ride_home) routeLine(it.ride_home.path, "ride");
+  it.stops.forEach((s, i) => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "",
+    html: `<div class="pin">${i + 1}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).bindTooltip(`${s.name}, ${s.arrive}`).addTo(layer));
+  L.marker(it.walks[0].path[0], { icon: origIcon() }).bindTooltip(d.start_name).addTo(layer);
+  frame(L.latLngBounds([it.walks[0].path[0], ...it.stops.map(s => [s.lat, s.lon])]));
+  updateCta();
+}
+
+// ── Ride chooser ─────────────────────────────────────────────────────────────
+async function openRideChooser() {
+  const o = options[active];
+  const leg = o.legs.find(l => l.mode === "ride");
+  if (!leg) return book();
+  openModal(`${closeBtn}<h3 id="modal-title">Choose a ride</h3><p class="fine" style="margin-top:0">Loading ride types…</p>`);
+  let data;
+  try {
+    data = await api("api/ride-options", { method: "POST", body: JSON.stringify({ leg: { path: [leg.path[0], leg.path.at(-1)],
+      distance_mi: leg.distance_mi, minutes: leg.minutes, surge: leg.surge, frm_name: leg.frm_name, to_name: leg.to_name },
+      hour: plan.request.hour, now_min: plan.request.leave_now ? minutesNowIn(plan.request.tz) : plan.request.hour * 60 }) });
+  } catch (e) { $("modal-body").innerHTML = `${closeBtn}<h3 id="modal-title">Choose a ride</h3><p class="error">${esc(e.message)}</p>`; return; }
+  let pick = data.options.find(x => x.available) || data.options[0];
+  const render = () => {
+    $("modal-body").innerHTML = `${closeBtn}<h3 id="modal-title">Choose a ride</h3>
+      <p class="fine" style="margin-top:0">${esc(data.pickup.name)} to ${esc(data.dropoff.name)}, ${dist(leg.distance_mi)}${leg.surge > 1 ? `. Prices are higher right now (${leg.surge}×).` : ""}</p>
+      <ul class="rides" role="listbox" aria-label="Ride types">${data.options.map(x => `
+        <li role="option" data-ride="${x.id}" aria-selected="${x.id === pick.id}" aria-disabled="${!x.available}" tabindex="${x.available ? 0 : -1}">
+          <span class="car">${icon(x.id === "taxi" ? "ride" : "ride")}</span>
+          <span><b>${esc(x.name)}</b> <span class="s">${icon("seat").replace('class="i"', 'class="i" style="width:14px;height:14px;vertical-align:-2px"')} ${x.seats}</span><br>
+            <span class="s">${x.available ? `${x.eta_min} min away${x.dropoff_min != null ? `, drop-off ${clockFromMinutes(x.dropoff_min)}` : ""}` : esc(x.reason)}</span><br>
+            <span class="s">${esc(x.blurb)}</span></span>
+          <span class="p">$${x.price_low.toFixed(0)}–${x.price_high.toFixed(0)}<small>${x.metered ? "est. meter" : "estimate"}</small></span>
+        </li>`).join("")}</ul>
+      <button class="cta" type="button" id="ride-confirm" style="margin-top:14px">Confirm ${esc(pick.name)}, about $${pick.price.toFixed(2)}</button>
+      <div class="compare"><a href="${esc(data.links.uber)}" target="_blank" rel="noopener noreferrer">Compare in Uber</a>
+        <a href="${esc(data.links.lyft)}" target="_blank" rel="noopener noreferrer">Compare in Lyft</a></div>
+      <p class="fine">${esc(data.note)}</p>`;
+    $("ride-confirm").onclick = () => { rideChoice = { ...pick, legCost: leg.cost }; book(); };
+    $("modal-body").querySelector(".rides").addEventListener("click", e => {
+      const li = e.target.closest("li[data-ride]"); if (!li || li.getAttribute("aria-disabled") === "true") return;
+      pick = data.options.find(x => x.id === li.dataset.ride); render();
+      $("modal-body").querySelector(`li[data-ride="${pick.id}"]`).focus();
+    });
+    $("modal-body").querySelector(".rides").addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.target.click(); }
+    });
+  };
+  render();
+}
+
+// ── Flights (door to door) ───────────────────────────────────────────────────
+function tomorrowIn(tz) {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: tz || "America/Los_Angeles" }));
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const hm = (m) => `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""}`;
+const money = (v, cur = "USD") => { try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(v); } catch { return `${cur} ${Math.round(v)}`; } };
+const stopsText = (off) => off.stops === 0 ? "Nonstop" : `${off.stops} stop${off.stops > 1 ? "s" : ""} via ${off.via.join(", ")}`;
+async function planFlights(info, date) {
+  const body = { ...placeParams("origin", sel.from), ...placeParams("destination", sel.to), date: date || tomorrowIn(),
+                 hour: 9, mode: MODE_WEIGHTS[mode] ? mode : "hustle", weight_kg: +$("kg").value };
+  showLoading(`${sel.from.name} to ${sel.to.name}`, `${info?.miles ? info.miles.toLocaleString() + " mi apart, so let's fly." : "Finding flights."}`,
+              "Finding airports and planning your trips to and from them…");
+  $("cta").textContent = "Finding flights…";
+  try {
+    flightData = await api("api/flights", { method: "POST", body: JSON.stringify(body) });
+    activeFlight = 0; renderFlights(true);
+  } catch (e) { showView("plan"); $("error").textContent = e.message; }
+}
+function renderFlights() {
+  const d = flightData;
+  $("r-title").textContent = `${d.origin_name} to ${d.destination_name}`;
+  $("r-sub").textContent = `${d.miles.toLocaleString()} mi apart, so here's how to fly, door to door.`;
+  const src = { duffel_live: ["Live fares (Duffel)", true], duffel_test: ["Duffel test mode", true], estimate: ["Estimated fares", false] }[d.fares_source] || ["Estimated fares", false];
+  $("conditions").innerHTML = `<label class="date-pill">${icon("clock")}<input type="date" id="fl-date" value="${esc(d.date)}" aria-label="Travel date"></label>
+    <span class="cond ${src[1] ? "on" : ""}" style="margin-top:12px"><span class="dot"></span>${esc(src[0])}</span>`;
+  notice("r-notice", d.note);
+  $("trace-box").hidden = true; $("rej-box").hidden = true;
+  const step = (ico, text, right) => `<li><span class="ic2">${icon(ico)}</span><span>${text}</span><span class="r">${right}</span></li>`;
+  $("results").innerHTML = d.options.map((o, i) => {
+    const g1 = o.ground_to, g2 = o.ground_from, f = o.flight, off = o.offer;
+    const priceTxt = off ? money(off.price, off.currency) : `$${o.total_low}–${o.total_high}`;
+    return `<div class="fl ${i === activeFlight ? "active" : ""}" data-fl="${i}" tabindex="0" role="button" aria-pressed="${i === activeFlight}">
+      <div class="fl-head"><span class="codes">${esc(o.dep.iata)} to ${esc(o.arr.iata)}</span><span class="price">${priceTxt}</span></div>
+      ${off ? `<div class="airline">${/^https:\/\//.test(off.logo) ? `<img src="${esc(off.logo)}" alt="">` : ""}${esc(off.airline)}, ${esc(off.flight_numbers.join(" + "))}</div>
+        <div class="sub">${esc(off.dep_local)} to ${esc(off.arr_local)}${off.arrives_next_day ? " (next day)" : ""}, ${esc(stopsText(off))}</div>
+        <div class="door">Leave home by <b>${esc(off.leave_by)}</b>, at your door by <b>${esc(off.at_door)}</b> (${hm(o.total_min)})</div>`
+      : `<div class="sub">${esc(o.dep.name)} to ${esc(o.arr.name)}</div>
+        <div class="sub"><b style="color:var(--ink)">${hm(o.total_min)}</b> door to door${f.international ? ", international" : ""}</div>`}
+      <ul class="steps">
+        ${step(g1.ok ? (g1.legs?.find(l => l.mode !== "walk")?.mode || "walk") : "ride", `To ${esc(o.dep.iata)}: ${esc(g1.ok ? g1.summary : "plan your own way")}`, g1.ok ? `${g1.minutes} min, $${g1.cost.toFixed(2)}` : "about 1 hr")}
+        ${step("clock", `Check-in and security`, `${f.buffer_before} min`)}
+        ${off ? step("plane", `${esc(off.airline)} ${esc(off.flight_numbers[0])}${off.stops ? ` + ${off.stops} more` : ""}`, `${hm(off.duration_min || f.minutes)}, ${money(off.price, off.currency)}`)
+              : step("plane", `Flight, ${f.km.toLocaleString()} km${f.stops ? `, ${f.stops} stop` : ", nonstop"}`, `about ${hm(f.minutes)}, $${f.fare_low}–${f.fare_high}`)}
+        ${step("clock", f.international ? "Deplane, passport control" : "Deplane", `${f.buffer_after} min`)}
+        ${step(g2.ok ? (g2.legs?.find(l => l.mode !== "walk")?.mode || "walk") : "ride", `From ${esc(o.arr.iata)}: ${esc(g2.ok ? g2.summary : "plan your own way")}`, g2.ok ? `${g2.minutes} min, $${g2.cost.toFixed(2)}` : "about 1 hr")}
+      </ul>
+      <div class="fare-links"><a href="${esc(o.links.google_flights)}" target="_blank" rel="noopener noreferrer">Google Flights</a>
+        <a href="${esc(o.links.skyscanner)}" target="_blank" rel="noopener noreferrer">Skyscanner</a>
+        <a href="${esc(o.links.kayak)}" target="_blank" rel="noopener noreferrer">Kayak</a></div>
+    </div>`;
+  }).join("");
+  $("fl-date").onchange = (e) => planFlights({ miles: d.miles }, e.target.value);
+  drawFlight(); updateCta();
+}
+function drawFlight() {
+  clearMap();
+  const o = flightData?.options[activeFlight]; if (!o) return;
+  layer = L.featureGroup().addTo(map);
+  for (const g of [o.ground_to, o.ground_from]) if (g.ok) for (const l of g.legs) routeLine(l.path, l.mode, l.color);
+  // Split the arc where it crosses the antimeridian so Leaflet doesn't draw across the world.
+  const segs = [[]];
+  o.arc.forEach((p, i) => { if (i && Math.abs(p[1] - o.arc[i - 1][1]) > 180) segs.push([]); segs.at(-1).push(p); });
+  for (const sgm of segs) L.polyline(sgm, { color: dark() ? "#f4f5f6" : "#000", weight: 3, dashArray: "6 8", opacity: .8 }).addTo(layer);
+  const planeIcon = (code) => L.divIcon({ className: "", html: `<div class="plane">${esc(code)}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+  L.marker([o.dep.lat, o.dep.lon], { icon: planeIcon(o.dep.iata) }).bindTooltip(o.dep.name).addTo(layer);
+  L.marker([o.arr.lat, o.arr.lon], { icon: planeIcon(o.arr.iata) }).bindTooltip(o.arr.name).addTo(layer);
+  L.marker([sel.from.lat, sel.from.lon], { icon: origIcon() }).bindTooltip(sel.from.name).addTo(layer);
+  L.marker([sel.to.lat, sel.to.lon], { icon: destIcon() }).bindTooltip(sel.to.name).addTo(layer);
+  frame(layer.getBounds());
+}
+
+async function selectFlight(o) {
+  const off = o.offer, test = flightData.fares_source === "duffel_test";
+  let saved = "";
+  if (me.user) {
+    try {
+      await refreshMe(await api("api/me/trips", { method: "POST", body: JSON.stringify({
+        origin: { name: sel.from.name, lat: sel.from.lat, lon: sel.from.lon },
+        destination: { name: sel.to.name, lat: sel.to.lat, lon: sel.to.lon }, mode: MODE_WEIGHTS[mode] ? mode : "hustle",
+        summary: { label: `Flight ${off.flight_numbers.join(" + ")}, ${o.dep.iata} to ${o.arr.iata}`, minutes: o.total_min,
+                   cost: off.currency === "USD" ? off.price : 0, kcal: 0, modes: ["ride", "flight"], kind: "trip" } }) }));
+      saved = `<p class="fine">Saved to your trips.</p>`;
+    } catch (e) { saved = `<p class="error">${esc(e.message)}</p>`; }
+  }
+  openModal(`${closeBtn}<h3 id="modal-title">${esc(off.airline)} ${esc(off.flight_numbers.join(" + "))}</h3>
+    ${test ? `<p><span class="badge">Duffel test mode: sample data</span></p>` : ""}
+    <p>${esc(o.dep.iata)} ${esc(off.dep_local)} to ${esc(o.arr.iata)} ${esc(off.arr_local)}${off.arrives_next_day ? " (next day)" : ""}, ${esc(stopsText(off))}.<br>
+      <b>${money(off.price, off.currency)}</b> per adult, economy.</p>
+    <p>Leave home by <b>${esc(off.leave_by)}</b>: ${esc(o.ground_to.ok ? o.ground_to.summary : "your own way")} to ${esc(o.dep.iata)}. You'll be at ${esc(sel.to.name)} around <b>${esc(off.at_door)}</b>.</p>
+    <p class="fine">Booking needs passenger details and payment, which Hopper doesn't collect yet. This offer ${off.expires_at ? `expires at ${esc(new Date(off.expires_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }))}` : "expires soon"}.</p>
+    ${saved}
+    <div class="fare-links"><a href="${esc(o.links.google_flights)}" target="_blank" rel="noopener noreferrer">Google Flights</a>
+      <a href="${esc(o.links.skyscanner)}" target="_blank" rel="noopener noreferrer">Skyscanner</a>
+      <a href="${esc(o.links.kayak)}" target="_blank" rel="noopener noreferrer">Kayak</a></div>
+    <button class="cta" type="button" data-close style="margin-top:14px">Done</button>`);
+}
+
+// ── Booking (demo) — saved to trip history when signed in ────────────────────
+async function book() {
+  let body, record = null;
+  if (crawlData) {
+    const it = crawlData.itinerary, r = it.ride_home;
+    const first = it.stops[0], last = it.stops.at(-1);
+    record = { origin: { name: crawlData.start_name, lat: it.walks[0].path[0][0], lon: it.walks[0].path[0][1] },
+               destination: r ? { name: r.to_name, lat: r.path.at(-1)[0], lon: r.path.at(-1)[1] } : { name: last.name, lat: last.lat, lon: last.lon },
+               mode: "barcrawl", summary: { label: `Bar crawl, ${it.stops.length} bars`, minutes: it.totals.minutes,
+               cost: r ? r.cost : 0, kcal: it.totals.kcal, modes: ["walk"].concat(r ? ["ride"] : []), kind: "crawl" } };
+    body = r ? `<h3 id="modal-title">Ride home booked</h3><p>Pickup at <b>${esc(r.frm_name)}</b> around ${esc(it.totals.ends)}. $${r.cost.toFixed(2)}.</p>`
+             : `<h3 id="modal-title">Have a great night</h3><p>Your crawl starts at ${esc(first.arrive)}.</p>`;
+  } else {
+    const o = options[active];
+    const ride = o.legs.find(l => l.mode === "ride");
+    const { title } = splitLabel(o.label);
+    const choice = ride ? rideChoice : null;
+    const cost = choice ? Math.round((o.cost - choice.legCost + choice.price) * 100) / 100 : o.cost;
+    record = { origin: plan.places.origin, destination: plan.places.destination, mode,
+               summary: { label: choice ? `${title}, ${choice.name}` : title, minutes: o.total_min, cost, kcal: o.kcal, modes: o.legs.map(l => l.mode) } };
+    body = `<h3 id="modal-title">${ride ? `${choice ? esc(choice.name) : "Ride"} booked` : "Trip saved"}</h3>
+      <p>${ride ? `Your driver will meet you at <b>${esc(ride.frm_name)}</b> in about ${choice ? choice.eta_min : ride.wait_min} min.` : "No ride needed. Follow the steps on your trip."}</p>
+      <p class="fine">Arrive around ${arrival(o.total_min)}, about $${cost.toFixed(2)}, ${o.kcal} kcal, ${o.steps.toLocaleString()} steps.</p>`;
+    rideChoice = null;
+  }
+  let saved = "";
+  if (me.user) {
+    try { await refreshMe(await api("api/me/trips", { method: "POST", body: JSON.stringify(record) })); saved = `<p class="fine">Saved to your trips.</p>`; }
+    catch (e) { saved = `<p class="error">${esc(e.message)}</p>`; }
+  } else {
+    saved = `<p class="fine"><button class="text-btn" type="button" data-tab="signin">Sign in</button> to keep your trip history.</p>`;
+  }
+  openModal(body + saved + `<p class="fine">This is a demo. No ride was requested and no payment was taken.</p>
+    <button class="cta" type="button" data-close style="margin-top:14px">Done</button>`);
+}
+
+// ── Events ───────────────────────────────────────────────────────────────────
+$("cta").onclick = () => {
+  if (view === "plan") return mode === "barcrawl" ? planCrawl() : planTrip();
+  if (flightData) {
+    const f = flightData.options[activeFlight];
+    if (f?.offer) return selectFlight(f);
+    if (f) window.open(f.links.google_flights, "_blank", "noopener");
+    return;
+  }
+  if (!crawlData && options[active]?.legs.some(l => l.mode === "ride")) return openRideChooser();
+  book();
+};
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") planTrip(); });
+$("back").onclick = () => { showView("plan"); crawlData = null; flightData = null; clearMap(); };
+$("swap").onclick = () => { const f = sel.from; setPlace("from", sel.to); setPlace("to", f); };
+$("cities").addEventListener("click", e => {
+  const b = e.target.closest("[data-city]"); if (!b) return;
+  const [name, lat, lon] = CITIES[+b.dataset.city];
+  document.querySelectorAll("#cities button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  searchCenter = [lat, lon];
+  map.flyTo([lat, lon], 13, { duration: 0.8 });
+  $("popular").hidden = name !== "San Francisco";
+  if (name === "San Francisco") { setPlace("from", landmarkPlace("ferry_building")); setPlace("to", landmarkPlace("coit_tower")); return; }
+  // New city: search is biased to wherever the map is, so start fresh there.
+  setPlace("from", null); setPlace("to", null);
+  $("from-input").placeholder = `Pickup in ${name}`; $("to-input").placeholder = `Where to in ${name}?`;
+  $("from-input").focus();
+});
+$("places").addEventListener("click", e => {
+  const b = e.target.closest("[data-place]");
+  if (!b) return;
+  setPlace("to", landmarkPlace(b.dataset.place));
+  if (sel.from?.key === b.dataset.place) setPlace("from", landmarkPlace(b.dataset.place === "union_square" ? "ferry_building" : "union_square"));
+  $("q").value = ""; planTrip();
+});
+for (const id of ["hour", "weather", "c-hour", "c-stops", "c-mins"]) $(id).addEventListener("change", syncPills);
+$("kg").addEventListener("change", () => { if (me.user) api("api/me/prefs", { method: "PUT", body: JSON.stringify({ weight_kg: +$("kg").value }) }).catch(() => {}); });
+for (const k of ["time", "cost", "health"]) {
+  $("w-" + k).addEventListener("input", () => {
+    $("v-" + k).textContent = $("w-" + k).value;
+    if (mode !== "barcrawl") {
+      mode = "custom";
+      document.querySelectorAll(".mode").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-checked", false); });
+    }
+    clearTimeout(rerankTimer); rerankTimer = setTimeout(rerankNow, 150);
+  });
+}
+document.addEventListener("click", e => {
+  const m = e.target.closest(".mode");
+  if (m) setMode(m.dataset.mode);
+});
+$("vibes").addEventListener("click", e => {
+  const b = e.target.closest("[data-vibe]");
+  if (!b) return;
+  vibe = b.dataset.vibe;
+  document.querySelectorAll("#vibes button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
+});
+$("results").addEventListener("click", e => {
+  const h = e.target.closest(".opt-head");
+  if (h) return selectOption(+h.dataset.i);
+  const fl = e.target.closest("[data-fl]");
+  if (fl && !e.target.closest("a")) { activeFlight = +fl.dataset.fl; renderFlights(); }
+});
+$("results").addEventListener("keydown", e => {
+  const fl = e.target.closest("[data-fl]");
+  if (fl && (e.key === "Enter" || e.key === " ") && !e.target.closest("a")) { e.preventDefault(); activeFlight = +fl.dataset.fl; renderFlights(); }
+});
+$("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("modal").classList.contains("open")) closeModal(); });
+addEventListener("resize", () => (layer ? frame() : map.invalidateSize()));
+init();
+</script>
+</body>
+</html>

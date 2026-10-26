@@ -1,9 +1,8 @@
 """
-Create the coordinator agent that orchestrates the specialist swarm.
+Create the coordinator agent that orchestrates a specialist swarm.
 
-The coordinator's roster is the four specialists created by create_specialists.py.
-The coordinator decides which specialists to consult, in what order, and how to
-synthesise their outputs into the final deliverable.
+The coordinator's roster comes from create_specialists.py. Customize its
+instructions below to define how it should delegate and assemble the result.
 
 Saves the coordinator's ID to .coordinator_id.
 
@@ -18,56 +17,50 @@ from pathlib import Path
 from anthropic import Anthropic
 
 
+EXPECTED_SPECIALISTS = {
+    "fitness_coach",
+    "scenic_route",
+    "traffic_avoider",
+    "cost_effective",
+    "bar_crawl",
+}
+
+
 COORDINATOR_SYSTEM = """\
-You are the Senior Partner running the Deal Desk. An inbound RFP has just
-arrived. Your job is to orchestrate the specialists, synthesise their work,
-and produce a single branded proposal response document.
+You are the dispatcher for a San Francisco route-planning demo. Every request
+contains an origin, a destination, a selected specialist, and a 5:00 PM local
+departure time. Supported specialist keys are:
 
-# Your roster
+- fitness_coach: an active walking, running, or cycling route;
+- scenic_route: a route emphasizing views, parks, and landmarks;
+- traffic_avoider: a reliable route that avoids 5:00 PM congestion;
+- cost_effective: the lowest practical door-to-door cost;
+- bar_crawl: a responsible, walking/transit/rideshare crawl for adults.
 
-You can call these specialists:
-- Pricing Specialist: commercial terms recommendation
-- Legal Reviewer: contract flags and counter-positions
-- Technical Fit Specialist: product capability fit
-- Competitive Intel Analyst: who else is in the deal and how to position
+Validate that the origin, destination, and specialist are present. Treat the
+San Francisco / SFO area as the service area. If a location is ambiguous or
+apparently unsupported, explain the issue and request only the missing detail.
 
-# How to run a deal
+For a valid request, delegate to exactly the selected specialist. Include the
+origin, destination, fixed departure time, and all user constraints verbatim.
+Do not ask other specialists for competing routes and do not silently replace
+the selected objective. You may follow up with the selected specialist once if
+its answer omits a required route element or violates a safety constraint.
 
-1. Read the RFP yourself first. Note the customer, scope, and any obvious
-   curveballs.
+Return the specialist's recommendation in this compact format:
 
-2. Delegate to ALL FOUR specialists in parallel. Each gets:
-   - The full RFP text
-   - A clear, narrow brief stating what you need from them
-   - A deadline ("answer in one message, ~300 words")
+Route style: <human-readable specialist name>
+Summary: <one sentence>
+Route:
+1. <ordered leg>
+2. <ordered leg>
+Totals: <estimated duration, distance, and cost as applicable>
+Why this fits: <brief explanation>
+Before leaving: <live-data, safety, accessibility, or hours checks>
 
-3. Synthesise their outputs into a single proposal response. The response
-   should cover:
-   - Executive summary (3 bullets)
-   - Our understanding of the customer's need
-   - Why we're the right fit (drawing on Technical Fit + Competitive Intel)
-   - Commercial proposal (drawing on Pricing)
-   - Contract approach (drawing on Legal)
-   - Risks and how we mitigate them
-
-4. Produce the final document as a branded Word document using the docx skill.
-   Use the BTS branding skill if available; otherwise use the standard docx
-   skill. The deliverable is the docx itself, not a chat message.
-
-# How to talk to specialists
-
-When delegating, be direct: "Pricing Specialist: for this RFP, recommend
-terms. Include discount band and red-line concessions. Cite past-wins.json
-where relevant."
-
-When you receive a specialist's reply, accept it. Don't second-guess. If
-you genuinely disagree, send the specialist a follow-up — but only if it
-matters.
-
-# Tone
-
-Senior partner running a real deal. Confident, terse, decisive. You move
-fast because the RFP deadline is real.
+Preserve uncertainty labels. Never imply access to live traffic, transit,
+closure, price, weather, or venue-hours data unless the specialist cites a
+current source. This is route guidance, not turn-by-turn navigation.
 """
 
 
@@ -80,6 +73,15 @@ def main() -> None:
     if not specialist_ids_path.exists():
         raise SystemExit("Run create_specialists.py first.")
     specialist_ids = json.loads(specialist_ids_path.read_text())
+    configured_specialists = set(specialist_ids)
+    if configured_specialists != EXPECTED_SPECIALISTS:
+        missing = sorted(EXPECTED_SPECIALISTS - configured_specialists)
+        unexpected = sorted(configured_specialists - EXPECTED_SPECIALISTS)
+        raise SystemExit(
+            "Specialist IDs do not match the route roster. Run "
+            f"create_specialists.py again. Missing: {missing}; "
+            f"unexpected: {unexpected}."
+        )
 
     client = Anthropic(
         api_key=api_key,
@@ -87,8 +89,8 @@ def main() -> None:
     )
 
     coordinator = client.beta.agents.create(
-        name="Deal Desk Senior Partner",
-        model="claude-opus-4-7",  # Coordinator deserves the most capable model
+        name="San Francisco Route Dispatcher",
+        model="claude-opus-4-7",
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
         multiagent={
@@ -98,17 +100,13 @@ def main() -> None:
                 for agent_id in specialist_ids.values()
             ],
         },
-        metadata={
-            "hackathon": "partner-basecamp-2026",
-            "track": "specialist-swarm",
-            "role": "coordinator",
-        },
+        metadata={"role": "route_dispatcher"},
     )
 
     Path(".coordinator_id").write_text(coordinator.id)
     print(f"Coordinator created: {coordinator.id}")
     print(f"Roster: {list(specialist_ids.keys())}")
-    print(f"\nNext: python upload_skills.py then python run_deal_desk.py")
+    print("\nNext: python upload_skills.py (if using skills), then python run_swarm.py")
 
 
 if __name__ == "__main__":

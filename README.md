@@ -1,83 +1,82 @@
-# Option 3 — Specialist Swarm
+# San Francisco Route Specialist Swarm
 
-**Concept landed:** Skills, plugins & sub-agents
-**Tech:** [Claude Managed Agents multi-agent](https://platform.claude.com/docs/en/managed-agents/multi-agent) + [custom Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) + the pre-built [docx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart)
-**Time:** 60 minutes
-**Output:** A coordinator agent that fans work out to 3-5 specialist sub-agents, each with its own skills, that assemble a real branded Word document.
+A coordinator-and-specialists routing demo built with Anthropic Managed
+Agents. A user supplies an origin, destination, and route style; the dispatcher
+selects exactly one of five specialists to propose a path for a 5:00 PM trip in
+the San Francisco / SFO area.
 
-## The pitch
+The route styles are:
 
-This is the architecture that wins the next $50M transformation deal: **coordinator + specialists + skills**. It maps directly to how every services firm structures real work. A senior partner orchestrates; specialists (legal, pricing, technical) own their lanes; the senior partner synthesises and delivers.
+- `fitness_coach` — a safe walking, running, or cycling workout;
+- `scenic_route` — views, parks, architecture, and landmarks;
+- `traffic_avoider` — a reliable commute that avoids congestion;
+- `cost_effective` — the lowest practical total trip cost;
+- `bar_crawl` — a responsible adult crawl using walking or hired transport.
 
-You're going to build exactly that, in 60 minutes, around a Deal Desk scenario. Drop an RFP in, get a branded response doc out, watch the parallelism happen in real time on the events stream.
+## Requirements
 
-## Setup (5 min)
-
-You need a workspace API key on the Console (multi-agent is currently in research preview — your workspace may need to be granted access).
+- Python 3.10+
+- An Anthropic API key with access to Managed Agents
 
 ```bash
-cd 03-specialist-swarm
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY="sk-ant-..."
+export ANTHROPIC_API_KEY="your-api-key"
 ```
 
-## Pick a scenario card
+## Build and run
 
-Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coordinator + a different roster of specialists. Pick one. Different teams should pick different cards.
+1. **Provision an environment.** Run `python setup_environment.py`. The
+   environment ID is saved to `.environment_id` and reused on later runs.
+2. **Create specialists.** Run `python create_specialists.py`. IDs are saved to
+   `.specialist_ids.json`.
+3. **Create the coordinator.** Run `python create_coordinator.py`. Its ID is
+   saved to `.coordinator_id`.
+4. **Add optional skills.** Create skill directories under `skills/`, each
+   containing a `SKILL.md` with YAML frontmatter (`name` and `description`).
+   Map each directory to a specialist key in `SKILL_TO_SPECIALIST` in
+   [`upload_skills.py`](./upload_skills.py), then run `python upload_skills.py`.
+5. **Request a route.** Choose a specialist and provide both endpoints:
 
-## Core build (25 min)
+   ```bash
+   python run_swarm.py \
+     "Ferry Building" \
+     "Golden Gate Park" \
+     --specialist scenic_route \
+     --constraints "Avoid steep hills"
+   ```
 
-1. **Create the specialists.** Run `python create_specialists.py`. This creates 3-4 sub-agents (Pricing, Legal, Technical Fit, Competitive) and saves their IDs to `.specialist_ids.json`.
+   Add `--context path/to/context.txt` when extra route context is useful. The
+   event stream is printed and the coordinator transcript is saved under
+   `outputs/`.
+6. **Download session files later if needed.** Run
+   `python download_deliverable.py [session_id]`. If no ID is provided, it
+   uses `.last_session_id`.
 
-2. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster.
+## Routing behavior
 
-3. **Upload the skills.** Run `python upload_skills.py`. This packages the custom skills in `skills/` and uploads them via the Skills API. Each specialist gets the skill that matches its domain.
+- The selected specialist is the only one consulted for a request.
+- The departure time is fixed at 5:00 PM Pacific time.
+- Routes include ordered legs, estimates, rationale, and checks to make before
+  departure.
+- Specialists must label estimates and may not fabricate live traffic,
+  closures, transit arrivals, prices, weather, or venue hours.
+- These are route suggestions, not turn-by-turn navigation.
 
-4. **Run the deal.** Run `python run_deal_desk.py`. This:
-   - Uploads the synthetic RFP (`synthetic-data/rfp-acme-corp.md`) as a file
-   - Starts a session against the coordinator
-   - Asks the coordinator to produce a full proposal response
-   - Streams the events so you can watch the parallel thread fan-out
-   - Saves the final docx to `outputs/proposal-response.docx`
+## Project files
 
-By minute 30 you have a Word document in `outputs/`, generated by a coordinator + specialists who each used their own skill.
-
-## Stretch goals (20 min)
-
-See [`stretch-goals.md`](./stretch-goals.md). The big ones:
-
-- **Custom firm-voice skill** — codify your own firm's voice (every services firm has one)
-- **Critic sub-agent** — add a fifth agent that reviews the coordinator's draft before it's finalised
-- **Memory across deals** — coordinator remembers past wins and re-uses the right ones
-- **Synthetic MCP for past wins** — wire up a fake CRM to the pricing specialist
-
-## Two-minute demo
-
-Two-monitor setup:
-- **Monitor 1:** the events stream from the coordinator session, scrolling. You'll see `session.thread_created` × 4, parallel `running`, then `agent.thread_message_received` flowing back. The visible parallelism IS the demo.
-- **Monitor 2:** open `outputs/proposal-response.docx`. Real document, branded, ready to send.
-
-Narrate the events stream while it runs. The room will get it.
-
-## What's in this folder
-
-```
-03-specialist-swarm/
+```text
+.
 ├── README.md
-├── scenario-cards.md
-├── stretch-goals.md
 ├── requirements.txt
-├── create_specialists.py          (creates the sub-agents)
-├── create_coordinator.py          (creates the coordinator)
-├── upload_skills.py               (uploads custom skills via Skills API)
-├── run_deal_desk.py               (runs the full swarm against an RFP)
-├── stretch_critic_subagent.py     (stretch: critic agent)
-├── skills/                        (custom skills, one per specialist)
-│   ├── pricing-playbook/SKILL.md
-│   ├── legal-checklist/SKILL.md
-│   └── competitive-intel/SKILL.md
-└── synthetic-data/
-    ├── rfp-acme-corp.md           (the RFP that triggers the swarm)
-    ├── past-wins.json             (used by pricing specialist)
-    └── product-overview.md        (used by technical specialist)
+├── create_specialists.py       # Creates specialist agents
+├── create_coordinator.py       # Creates the coordinator agent
+├── setup_environment.py        # Provisions a Managed Agents environment
+├── upload_skills.py            # Uploads and attaches custom skills
+├── run_swarm.py                # Runs a task and streams session events
+├── download_deliverable.py     # Downloads files from a session
+└── skills/                     # Add custom skill directories here
 ```
+
+See the [Managed Agents documentation](https://platform.claude.com/docs/en/managed-agents/multi-agent)
+and [Agent Skills documentation](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+for API details.

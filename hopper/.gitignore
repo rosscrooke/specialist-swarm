@@ -1,0 +1,9 @@
+.env
+.cache/
+__pycache__/
+.pytest_cache/
+.DS_Store
+data/
+eval-results.json
+ui-results/
+test-results/

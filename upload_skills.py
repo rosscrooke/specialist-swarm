@@ -18,12 +18,8 @@ from anthropic import Anthropic
 from anthropic.lib import files_from_dir
 
 
-# Map skill directory name → specialist key that should get it
-SKILL_TO_SPECIALIST = {
-    "pricing-playbook": "pricing",
-    "legal-checklist":  "legal",
-    "competitive-intel": "competitive",
-}
+# Map each skill directory name to the key of the specialist that should get it.
+SKILL_TO_SPECIALIST: dict[str, str] = {}
 
 
 def main() -> None:
@@ -38,8 +34,7 @@ def main() -> None:
     client = Anthropic()
 
     # List existing custom skills so we can detect and reuse any prior uploads.
-    # Skills API enforces unique display_title, so retrying with the same title
-    # would otherwise fail. Idempotent retry is essential for hackathon dev loops.
+    # Skill display titles must be unique, so reuse previously uploaded skills.
     print("Checking for existing skills...")
     existing_by_title: dict[str, str] = {}
     for page in client.beta.skills.list(source="custom"):
@@ -50,8 +45,12 @@ def main() -> None:
     for skill_name, specialist_key in SKILL_TO_SPECIALIST.items():
         skill_dir = Path("skills") / skill_name
         if not (skill_dir / "SKILL.md").exists():
-            print(f"  Skipping {skill_name} — no SKILL.md found")
-            continue
+            raise SystemExit(f"Missing skills/{skill_name}/SKILL.md")
+        if specialist_key not in specialist_ids:
+            raise SystemExit(
+                f"Unknown specialist key {specialist_key!r} for skill {skill_name!r}. "
+                "Check .specialist_ids.json and SKILL_TO_SPECIALIST."
+            )
 
         display_title = skill_name.replace("-", " ").title()
 
@@ -94,8 +93,8 @@ def main() -> None:
         print(f"  attached ✓")
 
     Path(".skill_ids.json").write_text(json.dumps(uploaded, indent=2))
-    print(f"\nUploaded {len(uploaded)} skills and attached them to specialists.")
-    print("Next: python run_deal_desk.py")
+    print(f"\nUploaded and attached {len(uploaded)} skills.")
+    print("Next: python run_swarm.py \"Describe the task for the swarm\"")
 
 
 if __name__ == "__main__":

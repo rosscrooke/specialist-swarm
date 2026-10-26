@@ -1,0 +1,352 @@
+{
+ "caltrain-to-warriors-rain/broke": {
+  "legs": "muni:Muni T Third (Central Subway)",
+  "total_min": 10.0,
+  "cost": 2.85,
+  "kcal": 0
+ },
+ "caltrain-to-warriors-rain/burn": {
+  "legs": "muni:Muni T Third (Central Subway)",
+  "total_min": 10.0,
+  "cost": 2.85,
+  "kcal": 0
+ },
+ "caltrain-to-warriors-rain/hustle": {
+  "legs": "muni:Muni T Third (Central Subway)",
+  "total_min": 10.0,
+  "cost": 2.85,
+  "kcal": 0
+ },
+ "castro-to-giants-game/broke": {
+  "legs": "walk+bart:BART (SFO line)+walk",
+  "total_min": 55.6,
+  "cost": 2.4,
+  "kcal": 149
+ },
+ "castro-to-giants-game/burn": {
+  "legs": "walk+muni:Muni N Judah+walk",
+  "total_min": 63.8,
+  "cost": 2.85,
+  "kcal": 181
+ },
+ "castro-to-giants-game/hustle": {
+  "legs": "ebike",
+  "total_min": 17.0,
+  "cost": 9.3,
+  "kcal": 60
+ },
+ "crawl/castro-lgbtq-rain": {
+  "bars": [
+   "Twin Peaks Tavern",
+   "Lookout",
+   "Hi Tops"
+  ]
+ },
+ "crawl/hayes-wine-two": {
+  "bars": [
+   "Churchill",
+   "Last Rites"
+  ]
+ },
+ "crawl/mission-cocktails-end-castro": {
+  "bars": [
+   "Dahlia",
+   "ABV",
+   "Churchill",
+   "Last Rites"
+  ]
+ },
+ "crawl/north-beach-any": {
+  "bars": [
+   "The Saloon",
+   "Vesuvio",
+   "Comstock Saloon"
+  ]
+ },
+ "crawl/union-square-five-end-ferry": {
+  "bars": [
+   "Pacific Cocktail Haven",
+   "Top of the Mark",
+   "Tonga Room & Hurricane Bar",
+   "Irish Bank",
+   "Bar Fluxus"
+  ]
+ },
+ "ferry-to-painted-ladies-am/broke": {
+  "legs": "walk+bart:BART (SFO line)+walk",
+  "total_min": 39.8,
+  "cost": 2.4,
+  "kcal": 117
+ },
+ "ferry-to-painted-ladies-am/burn": {
+  "legs": "walk+muni:Muni N Judah+walk",
+  "total_min": 55.3,
+  "cost": 2.85,
+  "kcal": 188
+ },
+ "ferry-to-painted-ladies-am/hustle": {
+  "legs": "ebike",
+  "total_min": 15.5,
+  "cost": 8.85,
+  "kcal": 54
+ },
+ "ferry-to-painted-ladies-rain/broke": {
+  "legs": "walk+bart:BART (SFO line)+ride",
+  "total_min": 29.5,
+  "cost": 14.35,
+  "kcal": 19
+ },
+ "ferry-to-painted-ladies-rain/burn": {
+  "legs": "walk+bart:BART (SFO line)+ride",
+  "total_min": 29.5,
+  "cost": 14.35,
+  "kcal": 19
+ },
+ "ferry-to-painted-ladies-rain/hustle": {
+  "legs": "ride",
+  "total_min": 28.5,
+  "cost": 17.72,
+  "kcal": 0
+ },
+ "flights/ferry-to-santa-monica/broke": {
+  "airports": "SJC>LAX",
+  "total_min": 330,
+  "total_low": 101
+ },
+ "flights/ferry-to-santa-monica/hustle": {
+  "airports": "OAK>LAX",
+  "total_min": 249,
+  "total_low": 137
+ },
+ "flights/mission-to-pike-place/hustle": {
+  "airports": "SFO>SEA",
+  "total_min": 304,
+  "total_low": 182
+ },
+ "flights/union-square-to-times-square/broke": {
+  "airports": "SFO>EWR",
+  "total_min": 582,
+  "total_low": 304
+ },
+ "flights/union-square-to-times-square/hustle": {
+  "airports": "SFO>EWR",
+  "total_min": 537,
+  "total_low": 359
+ },
+ "ggp-to-fidi-commute/broke": {
+  "legs": "muni:Muni 5 Fulton+walk",
+  "total_min": 37.4,
+  "cost": 2.85,
+  "kcal": 17
+ },
+ "ggp-to-fidi-commute/burn": {
+  "legs": "walk+muni:Muni N Judah+walk",
+  "total_min": 71.8,
+  "cost": 2.85,
+  "kcal": 179
+ },
+ "ggp-to-fidi-commute/hustle": {
+  "legs": "ride",
+  "total_min": 14.1,
+  "cost": 15.5,
+  "kcal": 0
+ },
+ "mission-to-coit-fog/broke": {
+  "legs": "bart:BART (SFO line)+walk",
+  "total_min": 37.2,
+  "cost": 2.4,
+  "kcal": 116
+ },
+ "mission-to-coit-fog/burn": {
+  "legs": "bart:BART (SFO line)+walk",
+  "total_min": 42.9,
+  "cost": 2.4,
+  "kcal": 140
+ },
+ "mission-to-coit-fog/hustle": {
+  "legs": "bart:BART (SFO line)+ride",
+  "total_min": 22.6,
+  "cost": 14.35,
+  "kcal": 0
+ },
+ "nob-hill-to-dolores-under-5/broke": {
+  "legs": "walk+bart:BART (SFO line)+walk",
+  "total_min": 37.2,
+  "cost": 2.4,
+  "kcal": 105
+ },
+ "nob-hill-to-dolores-under-5/burn": {
+  "legs": "walk+muni:Muni N Judah+walk",
+  "total_min": 53.3,
+  "cost": 2.85,
+  "kcal": 176
+ },
+ "nob-hill-to-dolores-under-5/hustle": {
+  "legs": "walk+bart:BART (SFO line)+walk",
+  "total_min": 37.2,
+  "cost": 2.4,
+  "kcal": 105
+ },
+ "ocean-beach-to-salesforce/broke": {
+  "legs": "muni:Muni N Judah+walk",
+  "total_min": 45.4,
+  "cost": 2.85,
+  "kcal": 17
+ },
+ "ocean-beach-to-salesforce/burn": {
+  "legs": "muni:Muni N Judah+walk",
+  "total_min": 67.3,
+  "cost": 2.85,
+  "kcal": 100
+ },
+ "ocean-beach-to-salesforce/hustle": {
+  "legs": "ride",
+  "total_min": 20.8,
+  "cost": 22.13,
+  "kcal": 0
+ },
+ "pier-39-to-lombard-short/broke": {
+  "legs": "walk",
+  "total_min": 19.8,
+  "cost": 0.0,
+  "kcal": 106
+ },
+ "pier-39-to-lombard-short/burn": {
+  "legs": "walk",
+  "total_min": 19.8,
+  "cost": 0.0,
+  "kcal": 106
+ },
+ "pier-39-to-lombard-short/hustle": {
+  "legs": "ride",
+  "total_min": 8.7,
+  "cost": 11.95,
+  "kcal": 0
+ },
+ "presidio-to-civic-late/broke": {
+  "legs": "walk+ride",
+  "total_min": 30.5,
+  "cost": 14.88,
+  "kcal": 34
+ },
+ "presidio-to-civic-late/burn": {
+  "legs": "walk+ride+walk",
+  "total_min": 39.5,
+  "cost": 14.5,
+  "kcal": 65
+ },
+ "presidio-to-civic-late/hustle": {
+  "legs": "ride",
+  "total_min": 22.1,
+  "cost": 15.71,
+  "kcal": 0
+ },
+ "union-square-to-sfo/broke": {
+  "legs": "walk+bart:BART (SFO line)",
+  "total_min": 43.7,
+  "cost": 10.95,
+  "kcal": 19
+ },
+ "union-square-to-sfo/burn": {
+  "legs": "walk+ride",
+  "total_min": 49.1,
+  "cost": 36.33,
+  "kcal": 86
+ },
+ "union-square-to-sfo/hustle": {
+  "legs": "ride",
+  "total_min": 37.2,
+  "cost": 48.55,
+  "kcal": 0
+ },
+ "wharf-to-twin-peaks-flat/broke": {
+  "legs": "ride",
+  "total_min": 14.5,
+  "cost": 15.93,
+  "kcal": 0
+ },
+ "wharf-to-twin-peaks-flat/burn": {
+  "legs": "walk+bart:BART (SFO line)+ride",
+  "total_min": 67.1,
+  "cost": 14.35,
+  "kcal": 120
+ },
+ "wharf-to-twin-peaks-flat/hustle": {
+  "legs": "ride",
+  "total_min": 14.5,
+  "cost": 15.93,
+  "kcal": 0
+ },
+ "world/london-kings-cross-to-big-ben-rain/broke": {
+  "legs": "walk+metro:Victoria toward Brixton+walk+metro:Jubilee toward Stratford+walk",
+  "total_min": 19.6,
+  "cost": 2.75,
+  "kcal": 30
+ },
+ "world/london-kings-cross-to-big-ben-rain/burn": {
+  "legs": "walk+metro:Victoria toward Brixton+walk+metro:Jubilee toward Stratford+walk",
+  "total_min": 19.6,
+  "cost": 2.75,
+  "kcal": 30
+ },
+ "world/london-kings-cross-to-big-ben-rain/hustle": {
+  "legs": "walk+metro:Victoria toward Brixton+walk+metro:Jubilee toward Stratford+walk",
+  "total_min": 19.6,
+  "cost": 2.75,
+  "kcal": 30
+ },
+ "world/nyc-times-square-to-brooklyn-bridge/broke": {
+  "legs": "walk+metro:A toward Far Rockaway-Mott Av+walk+bus:B25 toward DOWNTOWN BKLYN FRONT ST via FULTON+walk",
+  "total_min": 41.0,
+  "cost": 2.75,
+  "kcal": 51
+ },
+ "world/nyc-times-square-to-brooklyn-bridge/burn": {
+  "legs": "walk+bike+walk",
+  "total_min": 40.1,
+  "cost": 7.49,
+  "kcal": 256
+ },
+ "world/nyc-times-square-to-brooklyn-bridge/hustle": {
+  "legs": "ride",
+  "total_min": 14.5,
+  "cost": 15.87,
+  "kcal": 0
+ },
+ "world/paris-eiffel-to-louvre/broke": {
+  "legs": "walk+bus:42 toward Gare Saint-Lazare+walk+metro:1 toward Château de Vincennes+walk",
+  "total_min": 23.1,
+  "cost": 2.75,
+  "kcal": 26
+ },
+ "world/paris-eiffel-to-louvre/burn": {
+  "legs": "walk+rail:C toward FOOT+walk",
+  "total_min": 25.7,
+  "cost": 2.75,
+  "kcal": 59
+ },
+ "world/paris-eiffel-to-louvre/hustle": {
+  "legs": "walk+ebike+walk",
+  "total_min": 19.7,
+  "cost": 7.87,
+  "kcal": 66
+ },
+ "world/tokyo-shibuya-to-tokyo-tower/broke": {
+  "legs": "walk+rail:Z toward (普通 Local) 押上〈スカイツリー前〉 Oshiage (Skytree)+walk+metro:E toward (普通 Local) 都庁前 Tochomae+walk",
+  "total_min": 21.4,
+  "cost": 2.75,
+  "kcal": 26
+ },
+ "world/tokyo-shibuya-to-tokyo-tower/burn": {
+  "legs": "walk+bike+walk",
+  "total_min": 28.0,
+  "cost": 4.49,
+  "kcal": 169
+ },
+ "world/tokyo-shibuya-to-tokyo-tower/hustle": {
+  "legs": "walk+rail:Z toward (普通 Local) 押上〈スカイツリー前〉 Oshiage (Skytree)+walk+metro:E toward (普通 Local) 都庁前 Tochomae+walk",
+  "total_min": 21.4,
+  "cost": 2.75,
+  "kcal": 26
+ }
+}

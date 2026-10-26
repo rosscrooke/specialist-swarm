@@ -1,5 +1,5 @@
 """
-Create the cloud Environment that the Deal Desk session runs in.
+Create the cloud Environment used by Managed Agents sessions.
 
 Safe to run multiple times — if `.environment_id` already exists, it's reused.
 
