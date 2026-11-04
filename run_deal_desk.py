@@ -12,14 +12,18 @@ Usage:
 """
 
 import os
+import sys
 from pathlib import Path
 
 from anthropic import Anthropic
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "crm-mcp"))
+from custom_tool import is_crm_tool, run_crm_tool  # noqa: E402  (synthetic CRM)
+
 
 RFP_PATH = Path("synthetic-data/rfp-acme-corp.md")
 SUPPORTING_FILES = [
-    Path("synthetic-data/past-wins.json"),
+    # past-wins.json is no longer inlined: the Pricing Specialist queries it via the CRM tools
     Path("synthetic-data/product-overview.md"),
 ]
 OUTPUT_DIR = Path("outputs")
@@ -105,9 +109,25 @@ def main() -> None:
                     if getattr(block, "type", None) == "text":
                         final_text_parts.append(block.text)
                         print(block.text, end="", flush=True)
+            elif t == "agent.custom_tool_use":
+                if is_crm_tool(event.name):
+                    print(f"\n  [CRM ← {event.name}] {event.input}", flush=True)
+                    result_event = {
+                        "type": "user.custom_tool_result",
+                        "custom_tool_use_id": event.id,
+                        "content": [
+                            {"type": "text", "text": run_crm_tool(event.name, event.input)}
+                        ],
+                    }
+                    if event.session_thread_id:  # call came from a subagent thread
+                        result_event["session_thread_id"] = event.session_thread_id
+                    client.beta.sessions.events.send(session.id, events=[result_event])
             elif t == "agent.tool_use":
                 print(f"\n  [tool: {getattr(event, 'name', '?')}]", flush=True)
             elif t == "session.status_idle":
+                # Custom tool calls pause the session; keep streaming until we answered.
+                if event.stop_reason.type == "requires_action":
+                    continue
                 print("\n\n[swarm finished]")
                 break
 

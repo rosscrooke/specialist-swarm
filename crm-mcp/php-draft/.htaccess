@@ -1,0 +1,10 @@
+# Some shared hosts strip the Authorization header before PHP sees it.
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+# The data file is only read by index.php, never served directly.
+<Files "past-wins.json">
+    Require all denied
+</Files>
+<Files "config.php">
+    Require all denied
+</Files>

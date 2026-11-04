@@ -16,9 +16,13 @@ Usage:
 
 import json
 import os
+import sys
 from pathlib import Path
 
 from anthropic import Anthropic
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "crm-mcp"))
+from custom_tool import CRM_TOOLS  # noqa: E402  (synthetic CRM, custom-tool variant)
 
 
 SPECIALISTS = [
@@ -32,13 +36,16 @@ SPECIALISTS = [
             "Inputs you'll receive:\n"
             "- The RFP text\n"
             "- The pricing-playbook skill (your authoritative pricing rules)\n"
-            "- past-wins.json (recent comparable deals)\n\n"
+            "- CRM tools search_past_deals and get_deal (comparable past deals; "
+            "query them yourself, nothing is pasted for you)\n\n"
             "Your output: a one-page commercial recommendation covering:\n"
             "1. List price + recommended discount band\n"
             "2. Term and payment structure\n"
             "3. Any commercial concessions you'd accept and which you'd refuse\n"
             "4. Risks to the margin\n\n"
-            "Be specific about numbers. Cite the past-wins data when you use it."
+            "Be specific about numbers. Before recommending a discount, query "
+            "the CRM for comparable deals (industry, size, competitors) and cite "
+            "the customers you used."
         ),
     },
     {
@@ -115,7 +122,10 @@ def main() -> None:
             name=spec["name"],
             model=spec["model"],
             system=spec["system"],
-            tools=[{"type": "agent_toolset_20260401"}],
+            tools=[
+                {"type": "agent_toolset_20260401"},
+                *(CRM_TOOLS if spec["key"] == "pricing" else []),
+            ],
             metadata={
                 "hackathon": "partner-basecamp-2026",
                 "track": "specialist-swarm",

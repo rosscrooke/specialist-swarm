@@ -1,0 +1,74 @@
+{
+  "comparable_deals": [
+    {
+      "customer": "Globex Manufacturing",
+      "industry": "Industrial / Manufacturing",
+      "deal_size_annual_usd": 580000,
+      "tier": "Enterprise",
+      "term_years": 3,
+      "discount_from_list": 0.18,
+      "payment_terms": "Annual upfront, Net 30",
+      "primary_competitors": ["Snowflake", "Databricks"],
+      "won_on": "TCO + multi-cloud flexibility",
+      "lost_on": null,
+      "closed": "2025-09-14",
+      "notes": "Customer started with Snowflake demand. We won by running a 3-year TCO comparison at their actual workload profile (heavy unstructured)."
+    },
+    {
+      "customer": "Initech Sensors",
+      "industry": "Industrial / IoT",
+      "deal_size_annual_usd": 420000,
+      "tier": "Enterprise",
+      "term_years": 2,
+      "discount_from_list": 0.15,
+      "payment_terms": "Annual upfront, Net 60",
+      "primary_competitors": ["Microsoft Fabric"],
+      "won_on": "Real-time ingest performance + governance maturity",
+      "lost_on": null,
+      "closed": "2025-11-22",
+      "notes": "Acme is a similar profile. They demanded 25% discount, we settled at 15% by emphasising 3-year TCO. Microsoft was offering 'free with E5' but couldn't match real-time SLA."
+    },
+    {
+      "customer": "Stark Industries",
+      "industry": "Defence / Aerospace",
+      "deal_size_annual_usd": 1100000,
+      "tier": "Enterprise",
+      "term_years": 5,
+      "discount_from_list": 0.28,
+      "payment_terms": "Annual upfront, Net 30",
+      "primary_competitors": ["Databricks", "Snowflake", "Microsoft Fabric"],
+      "won_on": "Sovereign deployment + IP retention model",
+      "lost_on": null,
+      "closed": "2026-02-10",
+      "notes": "Stark wanted full IP assignment of custom work. We refused; instead offered licence-back to Stark of derivative works. They accepted."
+    },
+    {
+      "customer": "Wayne Manufacturing",
+      "industry": "Industrial",
+      "deal_size_annual_usd": 290000,
+      "tier": "Enterprise",
+      "term_years": 1,
+      "discount_from_list": 0.10,
+      "payment_terms": "Annual upfront, Net 30",
+      "primary_competitors": ["Snowflake"],
+      "won_on": "PoC success",
+      "lost_on": null,
+      "closed": "2026-03-05",
+      "notes": "Smaller deal, started with 90-day PoC. Customer credit-rolled PoC fee into Year 1. Reference customer agreement signed."
+    },
+    {
+      "customer": "Pied Piper Data",
+      "industry": "Tech / SaaS",
+      "deal_size_annual_usd": 0,
+      "tier": "(lost)",
+      "term_years": 0,
+      "discount_from_list": 0,
+      "payment_terms": null,
+      "primary_competitors": ["Databricks"],
+      "won_on": null,
+      "lost_on": "Pricing — couldn't get below 30% discount, Databricks went to 40%",
+      "closed": "2025-08-30",
+      "notes": "Losing example: Pied Piper was extremely price-sensitive and saw the platform as commodity. We should have walked away earlier."
+    }
+  ]
+}

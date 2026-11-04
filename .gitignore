@@ -15,3 +15,7 @@ outputs/
 __pycache__/
 *.pyc
 .venv/
+
+# CRM-MCP: secret token (never commit)
+crm-mcp/php-draft/config.php
+crm-mcp/.env
