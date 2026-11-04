@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Personal cloud resource IDs (per workspace, written by the scripts)
+.environment_id
+.coordinator_id
+.specialist_ids.json
+.skill_ids.json
+.last_session_id
+
+# Generated output
+outputs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
