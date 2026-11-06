@@ -1,9 +1,11 @@
 """
 Run the Deal Desk swarm against the synthetic RFP.
 
-Inlines the RFP + past-wins + product-overview into the user message (simpler
-than Files API for hackathon-scale content). Streams events as they come in so
-you can watch the parallel thread fan-out — this is the demo, narrate it live.
+Uploads the RFP + past-wins + product-overview with the Files API and mounts
+them read-only into the session at /mnt/session/uploads/. Every agent thread
+shares that disk, so the coordinator hands specialists file paths instead of
+pasted text. Streams events as they come in so you can watch the parallel
+thread fan-out — this is the demo, narrate it live.
 
 Saves the final transcript to outputs/.
 
@@ -23,18 +25,36 @@ SUPPORTING_FILES = [
     Path("synthetic-data/past-wins.json"),
     Path("synthetic-data/product-overview.md"),
 ]
+INPUT_FILES = [RFP_PATH, *SUPPORTING_FILES]
 OUTPUT_DIR = Path("outputs")
 
+# A file mounted with mount_path "/name.ext" appears here inside the container.
+UPLOADS_DIR = "/mnt/session/uploads"
+# Originals only need to outlive session creation; the session keeps its own copy.
+UPLOAD_TTL_SECONDS = 86_400
 
-def load_inputs_as_context() -> str:
-    blocks = []
-    for path in [RFP_PATH, *SUPPORTING_FILES]:
-        if not path.exists():
-            print(f"  WARNING: {path} missing — skipping")
-            continue
-        print(f"  including {path.name}")
-        blocks.append(f"=====  DOCUMENT: {path.name}  =====\n{path.read_text()}")
-    return "\n\n".join(blocks)
+
+def container_path(path: Path) -> str:
+    return f"{UPLOADS_DIR}/{path.name}"
+
+
+def upload_inputs(client: Anthropic) -> list[dict]:
+    """Upload each input file and return session `resources` that mount it."""
+    missing = [str(p) for p in INPUT_FILES if not p.exists()]
+    if missing:
+        raise SystemExit(f"Missing input file(s): {', '.join(missing)}")
+
+    resources = []
+    for path in INPUT_FILES:
+        uploaded = client.files.upload(
+            file=(path.name, path.read_bytes(), "text/plain"),
+            expires_in_seconds=UPLOAD_TTL_SECONDS,
+        )
+        print(f"  uploaded {path.name:24s} -> {uploaded.id}")
+        resources.append(
+            {"type": "file", "file_id": uploaded.id, "mount_path": f"/{path.name}"}
+        )
+    return resources
 
 
 def main() -> None:
@@ -53,28 +73,40 @@ def main() -> None:
 
     client = Anthropic()
 
-    print("Loading RFP + supporting docs...")
-    context = load_inputs_as_context()
+    print("Uploading RFP + supporting docs...")
+    resources = upload_inputs(client)
 
     print(f"\nStarting session against coordinator {coordinator_id}...")
     session = client.beta.sessions.create(
         agent=coordinator_id,
         environment_id=environment_id,
         title="Deal Desk — Acme Corp RFP",
+        resources=resources,
     )
     Path(".last_session_id").write_text(session.id)
 
+    mounted_file_ids = set()
+    for r in session.resources or []:
+        if getattr(r, "type", None) == "file":
+            mounted_file_ids.add(r.file_id)
+            print(f"  mounted {r.mount_path:24s} ({r.file_id})")
+
     user_message = (
-        "An RFP has just landed. Please run the standard Deal Desk process:\n"
-        "1. Read the RFP yourself.\n"
-        "2. Delegate to all four specialists in parallel.\n"
-        "3. Synthesise their replies.\n"
+        "An RFP has just landed. The inputs are already on the shared disk, "
+        "mounted read-only:\n"
+        f"- RFP: {container_path(RFP_PATH)}\n"
+        f"- Comparable past deals: {container_path(SUPPORTING_FILES[0])}\n"
+        f"- Product capability map: {container_path(SUPPORTING_FILES[1])}\n\n"
+        "Please run the standard Deal Desk process:\n"
+        "1. Read the RFP at the path above.\n"
+        "2. Delegate to all four specialists in one turn, following the "
+        "delegation contract: pass file paths, not file contents.\n"
+        "3. Synthesise from the specialists' report files.\n"
         "4. Produce the final proposal response as a branded Word document "
         "if you have access to a docx skill; otherwise output the response "
         "as a structured markdown document.\n\n"
         "Specialists have their own skills attached for their respective "
-        "domains. Move fast — the RFP deadline is real.\n\n"
-        f"{context}"
+        "domains. Move fast — the RFP deadline is real."
     )
 
     # Stream the events — this is the demo. Watch for parallel thread spawns.
@@ -124,8 +156,11 @@ def main() -> None:
         scope_id=session.id,
         betas=["managed-agents-2026-04-01"],
     )
+    input_names = {p.name for p in INPUT_FILES}
     file_count = 0
     for f in files.data:
+        if f.id in mounted_file_ids or f.filename in input_names:
+            continue  # our own inputs, mounted at session creation
         out_path = OUTPUT_DIR / f.filename
         print(f"  {f.filename}  ->  {out_path}")
         content = client.beta.files.download(f.id)
