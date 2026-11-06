@@ -11,9 +11,11 @@ import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from dotenv import load_dotenv
 
 
 def main() -> None:
+    load_dotenv()  # reads ANTHROPIC_API_KEY from .env when it isn't exported
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise SystemExit("Set ANTHROPIC_API_KEY before running.")
 

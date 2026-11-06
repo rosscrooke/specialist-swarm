@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from dotenv import load_dotenv
 
 
 COORDINATOR_SYSTEM = """\
@@ -72,6 +73,7 @@ fast because the RFP deadline is real.
 
 
 def main() -> None:
+    load_dotenv()  # reads ANTHROPIC_API_KEY from .env when it isn't exported
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise SystemExit("Set ANTHROPIC_API_KEY before running.")
@@ -86,13 +88,18 @@ def main() -> None:
         default_headers={"anthropic-beta": "managed-agents-2026-04-01"},
     )
 
-    coordinator = client.beta.agents.create(
+    params = dict(
         name="Deal Desk Senior Partner",
         model="claude-opus-4-7",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
+        # Pre-built Anthropic skill so the coordinator can write the .docx deliverable
+        skills=[{"type": "anthropic", "skill_id": "docx"}],
         multiagent={
             "type": "coordinator",
+            # No version given, so each specialist resolves to its latest version
+            # at create/update time and stays pinned to it. Run this AFTER
+            # upload_skills.py, or the roster points at skill-less versions.
             "agents": [
                 {"type": "agent", "id": agent_id}
                 for agent_id in specialist_ids.values()
@@ -105,10 +112,26 @@ def main() -> None:
         },
     )
 
-    Path(".coordinator_id").write_text(coordinator.id)
-    print(f"Coordinator created: {coordinator.id}")
-    print(f"Roster: {list(specialist_ids.keys())}")
-    print(f"\nNext: python upload_skills.py then python run_deal_desk.py")
+    # Safe to re-run: update the existing coordinator (re-pinning the roster to
+    # the specialists' latest versions) instead of creating a duplicate.
+    coordinator_path = Path(".coordinator_id")
+    if coordinator_path.exists():
+        coordinator_id = coordinator_path.read_text().strip()
+        current = client.beta.agents.retrieve(coordinator_id)
+        coordinator = client.beta.agents.update(
+            coordinator_id, version=current.version, **params
+        )
+        print(f"Coordinator updated: {coordinator.id} (v{coordinator.version})")
+    else:
+        coordinator = client.beta.agents.create(**params)
+        coordinator_path.write_text(coordinator.id)
+        print(f"Coordinator created: {coordinator.id}")
+
+    names = {v: k for k, v in specialist_ids.items()}
+    for ref in getattr(coordinator.multiagent, "agents", []):
+        print(f"  roster: {names.get(ref.id, ref.id):14s} {ref.id} v{ref.version}")
+    print(f"  skills: {[s.skill_id for s in coordinator.skills]}")
+    print(f"\nNext: python run_deal_desk.py")
 
 
 if __name__ == "__main__":

@@ -29,11 +29,13 @@ Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coor
 
 1. **Create the specialists.** Run `python create_specialists.py`. This creates 3-4 sub-agents (Pricing, Legal, Technical Fit, Competitive) and saves their IDs to `.specialist_ids.json`.
 
-2. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster.
+2. **Upload the skills.** Run `python upload_skills.py`. This packages the custom skills in `skills/` and uploads them via the Skills API. Each specialist gets the skill that matches its domain.
 
-3. **Upload the skills.** Run `python upload_skills.py`. This packages the custom skills in `skills/` and uploads them via the Skills API. Each specialist gets the skill that matches its domain.
+3. **Create the environment.** Run `python setup_environment.py`. This provisions the cloud container the session runs in and saves its ID to `.environment_id`.
 
-4. **Run the deal.** Run `python run_deal_desk.py`. This:
+4. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster, plus the pre-built `docx` skill. Run it **after** step 2: the roster pins each specialist's version at creation time, so a coordinator created earlier calls the specialists without their skills. Re-running it updates the existing coordinator rather than creating a new one.
+
+5. **Run the deal.** Run `python run_deal_desk.py`. This:
    - Uploads the synthetic RFP (`synthetic-data/rfp-acme-corp.md`) as a file
    - Starts a session against the coordinator
    - Asks the coordinator to produce a full proposal response
