@@ -18,11 +18,11 @@ jobs:
   deploy:
     runs-on: [self-hosted, Linux, X64]
     environment: vps
-    env:
-      # Keep the registry login out of ~/.docker on the box.
-      DOCKER_CONFIG: ${{ runner.temp }}/docker
     steps:
       - uses: actions/checkout@v4
+      # Keep the registry login out of ~/.docker on the box.
+      - name: Private Docker config
+        run: echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Build and push
