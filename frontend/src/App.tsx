@@ -11,6 +11,7 @@ type AgentEvent = {
   to_agent_name?: string;
   name?: string;
   message?: string;
+  stop_reason?: { type: string };
   content?: { type: string; text?: string }[];
 };
 
@@ -27,7 +28,8 @@ function describe(e: AgentEvent): Line | null {
     case "agent.message":
       return { kind: "text", text: (e.content ?? []).map((b) => b.text ?? "").join("") };
     case "session.status_idle":
-      return { kind: "done", text: "swarm finished" };
+      // requires_action means it waits on us, not that it is done.
+      return e.stop_reason?.type === "requires_action" ? null : { kind: "done", text: "swarm finished" };
     case "error":
       return { kind: "error", text: e.message ?? "error" };
     default:
