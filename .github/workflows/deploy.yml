@@ -1,0 +1,39 @@
+# Builds both images on the self-hosted runner on the VPS, pushes them to
+# GHCR, and hands the commit to server-infra's deploy script, which keeps the
+# compose file and the env file.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+    environment: vps
+    steps:
+      - uses: actions/checkout@v4
+      # Keep the registry login out of ~/.docker on the box.
+      - name: Private Docker config
+        run: echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push
+        run: |
+          for part in backend frontend; do
+            image=ghcr.io/pgoell/basecamp-$part:${{ github.sha }}
+            docker build -t "$image" "$part"
+            docker push "$image"
+          done
+      - name: Deploy
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | SSH_ORIGINAL_COMMAND=${{ github.sha }} ~/Code/server-infra/deploy/deploy.sh basecamp
+      - name: Log out
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"

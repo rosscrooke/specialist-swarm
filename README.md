@@ -1,83 +1,70 @@
-# Option 3 — Specialist Swarm
+# Deal Desk: specialist swarm
 
-**Concept landed:** Skills, plugins & sub-agents
-**Tech:** [Claude Managed Agents multi-agent](https://platform.claude.com/docs/en/managed-agents/multi-agent) + [custom Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) + the pre-built [docx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart)
-**Time:** 60 minutes
-**Output:** A coordinator agent that fans work out to 3-5 specialist sub-agents, each with its own skills, that assemble a real branded Word document.
+A coordinator agent hands an RFP to four specialist agents (pricing, legal, technical fit, competitive intel), each with its own skill, and turns their answers into a Word document. Built on [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/multi-agent).
 
-## The pitch
+Live at https://basecamp.pgoell.com (shared password; ask Pascal).
 
-This is the architecture that wins the next $50M transformation deal: **coordinator + specialists + skills**. It maps directly to how every services firm structures real work. A senior partner orchestrates; specialists (legal, pricing, technical) own their lanes; the senior partner synthesises and delivers.
+## Layout
 
-You're going to build exactly that, in 60 minutes, around a Deal Desk scenario. Drop an RFP in, get a branded response doc out, watch the parallelism happen in real time on the events stream.
+```
+backend/    Python, FastAPI. Starts sessions and streams their events.
+  app/agents.py      the agents: prompts, models, skills. Edit here.
+  app/setup.py       creates or updates the agents, writes swarm.json
+  app/main.py        the API under /api
+  swarm.json         agent and environment ids (not secret, committed)
+  skills/            one custom skill per specialist
+  synthetic-data/    the sample RFP and the files the specialists read
+frontend/   Bun and React. server.ts serves the page and, in development, forwards /api.
+docs/       scenario cards and stretch goals
+```
 
-## Setup (5 min)
+## Run it locally
 
-You need a workspace API key on the Console (multi-agent is currently in research preview — your workspace may need to be granted access).
+You need [uv](https://docs.astral.sh/uv/) and [Bun](https://bun.sh).
 
 ```bash
-cd 03-specialist-swarm
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY="sk-ant-..."
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > backend/.env    # gitignored
+
+cd backend
+uv sync
+set -a; . ./.env; set +a
+uv run fastapi dev app/main.py        # http://localhost:8000
+
+cd frontend                            # in a second terminal
+bun install
+bun dev                                # http://localhost:3000
 ```
+
+The backend uses the agents in `backend/swarm.json`, which the whole team shares.
+
+## Change the agents
+
+Edit `backend/app/agents.py`, then either:
+
+- run `uv run python -m app.setup` in `backend/` and commit `swarm.json` if it changed, or
+- start the **setup-agents** workflow on GitHub (Actions tab). It runs the same script with the team's key, commits `swarm.json` and deploys.
+
+Setup updates the agents in place, so their ids stay the same. Delete an entry from `swarm.json` to get a fresh one.
+
+## Deploy
+
+Every push to `main` deploys. The **deploy** workflow runs on a runner on the server: it builds both images, pushes them to GHCR and restarts the containers. The compose file, the env file and the Caddy route live in the server-infra repo.
+
+Pull requests run **check** on GitHub's own runners: the backend imports and the frontend builds.
 
 ## Pick a scenario card
 
-Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coordinator + a different roster of specialists. Pick one. Different teams should pick different cards.
+Three cards in [`docs/scenario-cards.md`](./docs/scenario-cards.md). Each gives you a coordinator and a different roster of specialists. Different teams should pick different cards.
 
-## Core build (25 min)
+## Stretch goals
 
-1. **Create the specialists.** Run `python create_specialists.py`. This creates 3-4 sub-agents (Pricing, Legal, Technical Fit, Competitive) and saves their IDs to `.specialist_ids.json`.
+See [`docs/stretch-goals.md`](./docs/stretch-goals.md):
 
-2. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster.
+- **Custom firm-voice skill**: codify your own firm's voice
+- **Critic sub-agent**: a fifth agent that reviews the coordinator's draft before it ships
+- **Memory across deals**: the coordinator remembers past wins and reuses the right ones
+- **Synthetic MCP for past wins**: wire a fake CRM to the pricing specialist
 
-3. **Upload the skills.** Run `python upload_skills.py`. This packages the custom skills in `skills/` and uploads them via the Skills API. Each specialist gets the skill that matches its domain.
+## Demo
 
-4. **Run the deal.** Run `python run_deal_desk.py`. This:
-   - Uploads the synthetic RFP (`synthetic-data/rfp-acme-corp.md`) as a file
-   - Starts a session against the coordinator
-   - Asks the coordinator to produce a full proposal response
-   - Streams the events so you can watch the parallel thread fan-out
-   - Saves the final docx to `outputs/proposal-response.docx`
-
-By minute 30 you have a Word document in `outputs/`, generated by a coordinator + specialists who each used their own skill.
-
-## Stretch goals (20 min)
-
-See [`stretch-goals.md`](./stretch-goals.md). The big ones:
-
-- **Custom firm-voice skill** — codify your own firm's voice (every services firm has one)
-- **Critic sub-agent** — add a fifth agent that reviews the coordinator's draft before it's finalised
-- **Memory across deals** — coordinator remembers past wins and re-uses the right ones
-- **Synthetic MCP for past wins** — wire up a fake CRM to the pricing specialist
-
-## Two-minute demo
-
-Two-monitor setup:
-- **Monitor 1:** the events stream from the coordinator session, scrolling. You'll see `session.thread_created` × 4, parallel `running`, then `agent.thread_message_received` flowing back. The visible parallelism IS the demo.
-- **Monitor 2:** open `outputs/proposal-response.docx`. Real document, branded, ready to send.
-
-Narrate the events stream while it runs. The room will get it.
-
-## What's in this folder
-
-```
-03-specialist-swarm/
-├── README.md
-├── scenario-cards.md
-├── stretch-goals.md
-├── requirements.txt
-├── create_specialists.py          (creates the sub-agents)
-├── create_coordinator.py          (creates the coordinator)
-├── upload_skills.py               (uploads custom skills via Skills API)
-├── run_deal_desk.py               (runs the full swarm against an RFP)
-├── stretch_critic_subagent.py     (stretch: critic agent)
-├── skills/                        (custom skills, one per specialist)
-│   ├── pricing-playbook/SKILL.md
-│   ├── legal-checklist/SKILL.md
-│   └── competitive-intel/SKILL.md
-└── synthetic-data/
-    ├── rfp-acme-corp.md           (the RFP that triggers the swarm)
-    ├── past-wins.json             (used by pricing specialist)
-    └── product-overview.md        (used by technical specialist)
-```
+Start a run in the web app and narrate the event log: threads spawn, specialists work side by side, replies come back. The Word document shows up under Deliverables when the swarm finishes.
