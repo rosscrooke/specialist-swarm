@@ -13,13 +13,14 @@ Bid Lead (Opus 5.5, depth 0)            → beliebig viele Spezialisten (paralle
 ## Quickstart
 
 ```bash
-uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...        # or put it in .env
-.venv/bin/python -m rfp_orchestrator --show-text
-.venv/bin/python -m pytest tests -q        # offline tests, no API calls
+cd backend
+uv sync
+export ANTHROPIC_API_KEY=sk-ant-...        # or put it in .env (repo root or backend/)
+uv run python -m rfp_orchestrator --show-text
+uv run python -m pytest tests -q           # offline tests, no API calls
 ```
 
-Output per run: `outputs/<run_id>/` with `inputs/`, `work/` (shared scratch),
+Output per run: `backend/outputs/<run_id>/` with `inputs/`, `work/` (shared scratch),
 `final/proposal-response.{md,docx}`, `events.jsonl`, `run-summary.json`.
 
 ## How it works

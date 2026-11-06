@@ -1,107 +1,137 @@
-"""HTTP API for the Deal Desk swarm.
+"""HTTP API for the RFP agent team (rfp_orchestrator, Claude Messages API).
 
-POST /api/runs starts a session, GET /api/runs/{id}/events streams its events
-as server-sent events, and the files routes hand out what the agents wrote.
+POST /api/runs                     start a run in the background -> {run_id}
+GET  /api/runs/{id}/events         server-sent events: full history, then live
+GET  /api/runs/{id}                status + agent tree
+GET  /api/runs/{id}/files          files the agents wrote (final/ and work/)
+GET  /api/runs/{id}/files/{path}   download one of them
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
+import os
+import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from anthropic import AsyncAnthropic
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "synthetic-data"
-SWARM = json.loads((ROOT / "swarm.json").read_text()) if (ROOT / "swarm.json").exists() else {}
-BETAS = ["managed-agents-2026-04-01"]
+from rfp_orchestrator.api import DATA_DIR, DEFAULT_OUTPUT_ROOT, new_run_id, run_rfp
+from rfp_orchestrator.events import Event
+
+load_dotenv()
+
 # Cloudflare drops a response that sends nothing for 100 seconds, and the
-# swarm can stay quiet longer than that while the specialists work.
+# agents can stay quiet longer than that while they work.
 PING_SECONDS = 20
+# Cost guard: how many runs may execute at the same time on this server.
+MAX_PARALLEL_RUNS = int(os.environ.get("RFP_MAX_PARALLEL_RUNS", "2"))
+LISTED_AREAS = ("final", "work")
 
-client = AsyncAnthropic()
-app = FastAPI()
+app = FastAPI(title="RFP agent team")
 
-# Kickoff messages waiting for their event stream to open. The stream only
-# carries events that happen after it opens, so the message goes out from
-# inside the stream handler.
-pending: dict[str, str] = {}
+
+@dataclass
+class RunState:
+    id: str
+    started_at: float = field(default_factory=time.time)
+    status: str = "running"  # running | finished | failed
+    error: str | None = None
+    history: list[str] = field(default_factory=list)  # serialized events, for replay
+    subscribers: set[asyncio.Queue] = field(default_factory=set)
+    summary: dict | None = None
+    task: asyncio.Task | None = None
+
+    async def publish(self, payload: dict) -> None:
+        data = json.dumps(payload, ensure_ascii=False, default=str)
+        self.history.append(data)
+        for q in list(self.subscribers):
+            q.put_nowait(data)
+
+    def close(self) -> None:
+        for q in list(self.subscribers):
+            q.put_nowait(None)
+
+
+runs: dict[str, RunState] = {}
 
 
 class RunRequest(BaseModel):
-    rfp: str
-
-
-def kickoff(rfp: str) -> str:
-    docs = [f"=====  DOCUMENT: rfp.md  =====\n{rfp}"] + [
-        f"=====  DOCUMENT: {p.name}  =====\n{p.read_text()}"
-        for p in (DATA / "past-wins.json", DATA / "product-overview.md")
-    ]
-    return (
-        "An RFP has just landed. Please run the standard Deal Desk process:\n"
-        "1. Read the RFP yourself.\n"
-        "2. Delegate to all four specialists in parallel.\n"
-        "3. Synthesise their replies.\n"
-        "4. Produce the final proposal response as a branded Word document "
-        "if you have access to a docx skill; otherwise output the response "
-        "as a structured markdown document.\n\n"
-        "Specialists have their own skills attached for their respective "
-        "domains. Move fast — the RFP deadline is real.\n\n" + "\n\n".join(docs)
-    )
+    rfp: str = Field(min_length=50, max_length=400_000)
+    instructions: str = Field(default="", max_length=4_000)
 
 
 @app.get("/api/health")
 async def health() -> dict:
-    return {"ok": True, "swarm": bool(SWARM)}
+    return {"ok": True, "active_runs": _active_runs()}
 
 
 @app.get("/api/rfp")
 async def sample_rfp() -> dict:
-    return {"rfp": (DATA / "rfp-acme-corp.md").read_text()}
+    return {"rfp": (DATA_DIR / "rfp-acme-corp.md").read_text(encoding="utf-8")}
 
 
 @app.post("/api/runs")
 async def start_run(req: RunRequest) -> dict:
-    if not SWARM:
-        raise HTTPException(503, "No swarm.json. Run `uv run python -m app.setup` first.")
-    session = await client.beta.sessions.create(
-        agent=SWARM["coordinator_id"],
-        environment_id=SWARM["environment_id"],
-        title="Deal Desk run",
-    )
-    pending[session.id] = kickoff(req.rfp)
-    return {"session_id": session.id, "console": f"https://platform.claude.com/sessions/{session.id}"}
+    if _active_runs() >= MAX_PARALLEL_RUNS:
+        raise HTTPException(429, f"{MAX_PARALLEL_RUNS} runs are already in progress. Try again later.")
+    state = RunState(id=new_run_id())
+    runs[state.id] = state
+    state.task = asyncio.create_task(_execute(state, req))
+    return {"run_id": state.id}
 
 
-@app.get("/api/runs/{session_id}/events")
-async def run_events(session_id: str) -> StreamingResponse:
+async def _execute(state: RunState, req: RunRequest) -> None:
+    async def sink(event: Event) -> None:
+        await state.publish(event.to_dict())
+
+    try:
+        result = await run_rfp(
+            rfp_text=req.rfp, instructions=req.instructions, run_id=state.id, sinks=[sink]
+        )
+        state.summary = asdict(result)
+        state.status = "finished" if result.ok else "failed"
+    except Exception as exc:  # report it to the page rather than dropping the stream
+        state.status, state.error = "failed", str(exc)
+        await state.publish({"type": "run_error", "run_id": state.id, "data": {"error": str(exc)}})
+    finally:
+        await state.publish({"type": "stream_end", "run_id": state.id, "data": {"status": state.status}})
+        state.close()
+
+
+@app.get("/api/runs/{run_id}")
+async def run_status(run_id: str) -> dict:
+    state = _get(run_id)
+    return {
+        "run_id": state.id,
+        "status": state.status,
+        "error": state.error,
+        "started_at": state.started_at,
+        "summary": state.summary,
+    }
+
+
+@app.get("/api/runs/{run_id}/events")
+async def run_events(run_id: str) -> StreamingResponse:
+    state = _get(run_id)
     queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-    async def pump() -> None:
-        try:
-            async with await client.beta.sessions.events.stream(session_id) as stream:
-                if message := pending.pop(session_id, None):
-                    await client.beta.sessions.events.send(
-                        session_id,
-                        events=[{"type": "user.message", "content": [{"type": "text", "text": message}]}],
-                    )
-                async for event in stream:
-                    await queue.put(f"data: {event.model_dump_json()}\n\n")
-                    if event.type == "session.status_terminated":
-                        break
-                    # Idle with requires_action waits on us; any other idle is the end.
-                    if event.type == "session.status_idle" and event.stop_reason.type != "requires_action":
-                        break
-        except Exception as exc:  # report it to the page rather than dropping the stream
-            await queue.put(f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n")
-        finally:
-            await queue.put(None)
+    # Snapshot + subscribe in one step (no await in between => no gap, no duplicates).
+    backlog = list(state.history)
+    done = state.status != "running"
+    if not done:
+        state.subscribers.add(queue)
 
     async def body():
-        task = asyncio.create_task(pump())
         try:
+            for data in backlog:
+                yield f"data: {data}\n\n"
+            if done:
+                return
             while True:
                 try:
                     item = await asyncio.wait_for(queue.get(), PING_SECONDS)
@@ -110,24 +140,51 @@ async def run_events(session_id: str) -> StreamingResponse:
                     continue
                 if item is None:
                     break
-                yield item
+                yield f"data: {item}\n\n"
         finally:
-            task.cancel()
+            state.subscribers.discard(queue)
 
     return StreamingResponse(body(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/api/runs/{session_id}/files")
-async def run_files(session_id: str) -> list[dict]:
-    page = await client.beta.files.list(scope_id=session_id, betas=BETAS)
-    return [{"id": f.id, "filename": f.filename, "size": f.size_bytes} for f in page.data]
+@app.get("/api/runs/{run_id}/files")
+async def run_files(run_id: str) -> list[dict]:
+    root = _run_dir(run_id)
+    out = []
+    for area in LISTED_AREAS:
+        for p in sorted((root / area).rglob("*")):
+            if p.is_file():
+                out.append({"path": str(p.relative_to(root)), "area": area, "size": p.stat().st_size})
+    return out
 
 
-@app.get("/api/files/{file_id}")
-async def download(file_id: str, name: str = "download") -> Response:
-    content = await client.beta.files.download(file_id)
-    return Response(
-        await content.read(),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{Path(name).name}"'},
-    )
+@app.get("/api/runs/{run_id}/files/{path:path}")
+async def download(run_id: str, path: str) -> FileResponse:
+    root = _run_dir(run_id)
+    target = (root / path).resolve()
+    if not target.is_relative_to(root) or target.relative_to(root).parts[0] not in LISTED_AREAS:
+        raise HTTPException(404, "Not found")
+    if not target.is_file():
+        raise HTTPException(404, "Not found")
+    return FileResponse(target, filename=target.name)
+
+
+# ---- helpers ------------------------------------------------------------- #
+def _active_runs() -> int:
+    return sum(1 for r in runs.values() if r.status == "running")
+
+
+def _get(run_id: str) -> RunState:
+    state = runs.get(run_id)
+    if state is None:
+        raise HTTPException(404, "Unknown run")
+    return state
+
+
+def _run_dir(run_id: str) -> Path:
+    if not run_id.isalnum():
+        raise HTTPException(404, "Unknown run")
+    root = (DEFAULT_OUTPUT_ROOT / run_id).resolve()
+    if not root.is_dir():
+        raise HTTPException(404, "Unknown run")
+    return root

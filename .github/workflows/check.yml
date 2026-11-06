@@ -17,6 +17,9 @@ jobs:
       - name: Backend imports
         working-directory: backend
         run: uv sync --frozen && ANTHROPIC_API_KEY=x uv run python -c "import app.main"
+      - name: Backend tests (offline, no API calls)
+        working-directory: backend
+        run: uv run python -m pytest tests -q
       - uses: oven-sh/setup-bun@v2
       - name: Frontend builds
         working-directory: frontend

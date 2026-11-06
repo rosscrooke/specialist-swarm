@@ -1,19 +1,18 @@
-# Deal Desk: specialist swarm
+# RFP Agent Team
 
-A coordinator agent hands an RFP to four specialist agents (pricing, legal, technical fit, competitive intel), each with its own skill, and turns their answers into a Word document. Built on [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/multi-agent).
+A bid lead agent orchestrates specialist agents (requirements, technical fit, pricing, legal, competitive intel, reviewer). Each specialist can send out up to three helper agents. Together they turn an RFP into a proposal (Markdown + Word). Built directly on the Claude Messages API: the orchestration, its limits and the event stream live in our own Python code (`backend/rfp_orchestrator`). Details: [`backend/ORCHESTRATION.md`](./backend/ORCHESTRATION.md).
 
 Live at https://basecamp.pgoell.com (shared password; ask Pascal).
 
 ## Layout
 
 ```
-backend/    Python, FastAPI. Starts sessions and streams their events.
-  app/agents.py      the agents: prompts, models, skills. Edit here.
-  app/setup.py       creates or updates the agents, writes swarm.json
-  app/main.py        the API under /api
-  swarm.json         agent and environment ids (not secret, committed)
-  skills/            one custom skill per specialist
-  synthetic-data/    the sample RFP and the files the specialists read
+backend/    Python, FastAPI.
+  rfp_orchestrator/  the agent team: roster + prompts (agents.py), limits (config.py), runtime
+  app/main.py        the API under /api: start runs, stream their events (SSE), download files
+  tests/             offline tests with a scripted fake client (no API calls)
+  skills/            one skill per specialist, injected into its system prompt
+  synthetic-data/    the sample RFP and the reference files the agents read
 frontend/   Bun and React. server.ts serves the page and, in development, forwards /api.
 docs/       scenario cards and stretch goals
 ```
@@ -23,34 +22,28 @@ docs/       scenario cards and stretch goals
 You need [uv](https://docs.astral.sh/uv/) and [Bun](https://bun.sh).
 
 ```bash
-echo 'ANTHROPIC_API_KEY=sk-ant-...' > backend/.env    # gitignored
+echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env     # gitignored; repo root or backend/
 
 cd backend
 uv sync
-set -a; . ./.env; set +a
 uv run fastapi dev app/main.py        # http://localhost:8000
+uv run python -m rfp_orchestrator     # or: one run in the terminal, no frontend
+uv run python -m pytest tests -q      # offline tests
 
 cd frontend                            # in a second terminal
 bun install
 bun dev                                # http://localhost:3000
 ```
 
-The backend uses the agents in `backend/swarm.json`, which the whole team shares.
-
 ## Change the agents
 
-Edit `backend/app/agents.py`, then either:
-
-- run `uv run python -m app.setup` in `backend/` and commit `swarm.json` if it changed, or
-- start the **setup-agents** workflow on GitHub (Actions tab). It runs the same script with the team's key, commits `swarm.json` and deploys.
-
-Setup updates the agents in place, so their ids stay the same. Delete an entry from `swarm.json` to get a fresh one.
+Edit `backend/rfp_orchestrator/agents.py` (prompts, models, roster) or `config.py` (limits). No setup step: the next run uses the change. Limits can also be set by env var, e.g. `RFP_MAX_CHILDREN_SPECIALIST=3`, `RFP_MAX_TOTAL_AGENTS=40`, `RFP_MAX_PARALLEL_RUNS=2` (see ORCHESTRATION.md).
 
 ## Deploy
 
 Every push to `main` deploys. The **deploy** workflow runs on a runner on the server: it builds both images, pushes them to GHCR and restarts the containers. The compose file, the env file and the Caddy route live in the server-infra repo.
 
-Pull requests run **check** on GitHub's own runners: the backend imports and the frontend builds.
+Pull requests run **check** on GitHub's own runners: the backend imports, the offline tests pass and the frontend builds. The server needs `ANTHROPIC_API_KEY` in its env file. Run workspaces live in `/app/outputs` inside the container and are lost on redeploy.
 
 ## Pick a scenario card
 
@@ -67,4 +60,4 @@ See [`docs/stretch-goals.md`](./docs/stretch-goals.md):
 
 ## Demo
 
-Start a run in the web app and narrate the event log: threads spawn, specialists work side by side, replies come back. The Word document shows up under Deliverables when the swarm finishes.
+Start a run in the web app and narrate the agent tree: the bid lead fans out to the specialists in parallel, they may send out helpers, the reviewer pushes back, and the Word document shows up under Deliverables at the end.

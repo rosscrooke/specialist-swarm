@@ -5,6 +5,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev && .venv/bin/playwright install --with-deps chromium
 COPY . .
+# Run workspaces (inputs, work, final, events). Not persistent across deploys.
+ENV RFP_OUTPUT_ROOT=/app/outputs
+RUN mkdir -p /app/outputs && chown 1000:1000 /app/outputs
 USER 1000:1000
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"

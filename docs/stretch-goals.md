@@ -22,7 +22,7 @@ Add the skill to the coordinator's skill list. Re-run the deal. The output shoul
 ## Tier 2 — Make the swarm smarter
 
 ### S2. The Critic sub-agent
-Run `uv run python -m app.stretch_critic` in `backend/`. This adds a fifth agent whose only job is to push back on the coordinator's draft before it ships. The coordinator now MUST consult the critic before producing the final doc. Watch what happens to quality.
+Already built in: the **Bid Reviewer** specialist (`backend/rfp_orchestrator/agents.py`) reviews the bid lead's draft and answers SHIP IT / REVISE / STOP; the bid lead revises at most twice. Tune its prompt and watch what happens to quality.
 
 **Why this lands:** Demonstrates an adversarial review pattern inside the swarm. Maps directly to how real services firms run a partner review.
 

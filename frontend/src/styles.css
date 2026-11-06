@@ -17,3 +17,20 @@ button:disabled { opacity: 0.5; cursor: default; }
 .error { color: #f28b82; }
 .files { display: grid; gap: 0.5rem; }
 .files h2 { margin: 0; font-size: 1.1rem; }
+h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.muted { color: #777; font-weight: normal; font-size: 0.9em; }
+.board { display: grid; grid-template-columns: minmax(280px, 1fr) 1.4fr; gap: 1rem; align-items: start; }
+@media (max-width: 800px) { .board { grid-template-columns: 1fr; } }
+.panel { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 1rem; max-height: 60vh; overflow: auto; }
+.tree { list-style: none; margin: 0; padding-left: 1rem; }
+.panel > .tree { padding-left: 0; }
+.tree li { margin: 0.2rem 0; }
+.tree summary { cursor: pointer; }
+.dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; margin-right: 0.4rem; background: #ccc; }
+.dot.running { background: #f9ab00; animation: pulse 1s infinite alternate; }
+.dot.done { background: #1e8e3e; }
+.dot.error { background: #d93025; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.35; } }
+.detail { margin: 0.3rem 0 0.6rem 1rem; }
+.detail .label { font-size: 0.8em; color: #777; text-transform: uppercase; }
+.detail pre { white-space: pre-wrap; font: 12px/1.4 ui-monospace, monospace; background: #f6f6f4; padding: 0.5rem; border-radius: 4px; max-height: 16rem; overflow: auto; margin: 0.2rem 0 0.5rem; }
