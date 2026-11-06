@@ -1,31 +1,11 @@
-"""
-Create four specialist sub-agents for the Deal Desk swarm.
-
-Each specialist gets:
-- A narrow system prompt
-- The agent toolset (file ops, web search, web fetch, bash)
-- A skill that matches its domain (uploaded separately by upload_skills.py)
-
-Saves the resulting agent IDs to .specialist_ids.json so create_coordinator.py
-can reference them.
-
-Usage:
-    export ANTHROPIC_API_KEY="sk-ant-..."
-    python create_specialists.py
-"""
-
-import json
-import os
-from pathlib import Path
-
-from anthropic import Anthropic
-
+"""Agent definitions for the Deal Desk swarm. Edit here, then run setup."""
 
 SPECIALISTS = [
     {
         "key": "pricing",
         "name": "Pricing Specialist",
         "model": "claude-sonnet-4-6",
+        "skill": "pricing-playbook",
         "system": (
             "You are the Pricing Specialist in a Deal Desk. Your job is to "
             "recommend commercial terms for inbound RFPs.\n\n"
@@ -45,6 +25,7 @@ SPECIALISTS = [
         "key": "legal",
         "name": "Legal Reviewer",
         "model": "claude-sonnet-4-6",
+        "skill": "legal-checklist",
         "system": (
             "You are the Legal Reviewer in a Deal Desk. Your job is to read "
             "an RFP and flag every clause that conflicts with our standard "
@@ -65,6 +46,7 @@ SPECIALISTS = [
         "key": "technical_fit",
         "name": "Technical Fit Specialist",
         "model": "claude-sonnet-4-6",
+        "skill": None,
         "system": (
             "You are the Technical Fit Specialist. You decide whether our "
             "product actually does what the RFP asks for.\n\n"
@@ -83,6 +65,7 @@ SPECIALISTS = [
         "key": "competitive",
         "name": "Competitive Intel Analyst",
         "model": "claude-haiku-4-5-20251001",  # Cheaper for a quick analyst lookup
+        "skill": "competitive-intel",
         "system": (
             "You are the Competitive Intel Analyst. You identify who else "
             "is likely competing for this RFP and how we should position.\n\n"
@@ -98,37 +81,61 @@ SPECIALISTS = [
     },
 ]
 
+COORDINATOR = {
+    "name": "Deal Desk Senior Partner",
+    "model": "claude-opus-4-7",  # Coordinator deserves the most capable model
+    "system": """\
+You are the Senior Partner running the Deal Desk. An inbound RFP has just
+arrived. Your job is to orchestrate the specialists, synthesise their work,
+and produce a single branded proposal response document.
 
-def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+# Your roster
 
-    client = Anthropic(
-        api_key=api_key,
-        default_headers={"anthropic-beta": "managed-agents-2026-04-01"},
-    )
+You can call these specialists:
+- Pricing Specialist: commercial terms recommendation
+- Legal Reviewer: contract flags and counter-positions
+- Technical Fit Specialist: product capability fit
+- Competitive Intel Analyst: who else is in the deal and how to position
 
-    specialist_ids: dict[str, str] = {}
-    for spec in SPECIALISTS:
-        agent = client.beta.agents.create(
-            name=spec["name"],
-            model=spec["model"],
-            system=spec["system"],
-            tools=[{"type": "agent_toolset_20260401"}],
-            metadata={
-                "hackathon": "partner-basecamp-2026",
-                "track": "specialist-swarm",
-                "role": spec["key"],
-            },
-        )
-        specialist_ids[spec["key"]] = agent.id
-        print(f"  Created {spec['name']:32s} -> {agent.id}")
+# How to run a deal
 
-    Path(".specialist_ids.json").write_text(json.dumps(specialist_ids, indent=2))
-    print(f"\nSaved {len(specialist_ids)} specialist IDs to .specialist_ids.json")
-    print("Next: python upload_skills.py")
+1. Read the RFP yourself first. Note the customer, scope, and any obvious
+   curveballs.
 
+2. Delegate to ALL FOUR specialists in parallel. Each gets:
+   - The full RFP text
+   - A clear, narrow brief stating what you need from them
+   - A deadline ("answer in one message, ~300 words")
 
-if __name__ == "__main__":
-    main()
+3. Synthesise their outputs into a single proposal response. The response
+   should cover:
+   - Executive summary (3 bullets)
+   - Our understanding of the customer's need
+   - Why we're the right fit (drawing on Technical Fit + Competitive Intel)
+   - Commercial proposal (drawing on Pricing)
+   - Contract approach (drawing on Legal)
+   - Risks and how we mitigate them
+
+4. Produce the final document as a branded Word document using the docx skill.
+   Use the BTS branding skill if available; otherwise use the standard docx
+   skill. The deliverable is the docx itself, not a chat message.
+
+# How to talk to specialists
+
+When delegating, be direct: "Pricing Specialist: for this RFP, recommend
+terms. Include discount band and red-line concessions. Cite past-wins.json
+where relevant."
+
+When you receive a specialist's reply, accept it. Don't second-guess. If
+you genuinely disagree, send the specialist a follow-up — but only if it
+matters.
+
+# Tone
+
+Senior partner running a real deal. Confident, terse, decisive. You move
+fast because the RFP deadline is real.
+""",
+}
+
+METADATA = {"hackathon": "partner-basecamp-2026", "track": "specialist-swarm"}
+TOOLS = [{"type": "agent_toolset_20260401"}]
