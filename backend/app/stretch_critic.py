@@ -12,7 +12,10 @@ to include it. Then update the coordinator's system prompt to "always
 consult the Critic on the draft before finalising."
 
 Usage:
-    python stretch_critic_subagent.py
+    uv run python -m app.stretch_critic
+
+Note: app.setup rewrites the coordinator from app/agents.py, so a later setup
+run drops the critic again. To keep it, add it to app/agents.py instead.
 """
 
 import json
@@ -49,8 +52,10 @@ def main() -> None:
     if not api_key:
         raise SystemExit("Set ANTHROPIC_API_KEY before running.")
 
-    coordinator_id = Path(".coordinator_id").read_text().strip()
-    specialist_ids = json.loads(Path(".specialist_ids.json").read_text())
+    swarm_path = Path(__file__).resolve().parent.parent / "swarm.json"
+    swarm = json.loads(swarm_path.read_text())
+    coordinator_id = swarm["coordinator_id"]
+    specialist_ids = swarm["specialists"]
 
     client = Anthropic(
         api_key=api_key,
@@ -73,7 +78,7 @@ def main() -> None:
 
     # Add critic to specialist IDs and persist
     specialist_ids["critic"] = critic.id
-    Path(".specialist_ids.json").write_text(json.dumps(specialist_ids, indent=2))
+    swarm_path.write_text(json.dumps(swarm, indent=2) + "\n")
 
     # Update coordinator's roster to include the critic
     coordinator = client.beta.agents.retrieve(coordinator_id)
@@ -102,7 +107,7 @@ def main() -> None:
     )
 
     print(f"Coordinator roster updated. Now includes critic.")
-    print("Re-run run_deal_desk.py to see the critic in action.")
+    print("Start a new run in the web app to see the critic in action.")
 
 
 if __name__ == "__main__":

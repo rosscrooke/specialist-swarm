@@ -1,0 +1,35 @@
+# Creates or updates the agents from backend/app/agents.py with the shared
+# API key, commits the ids in backend/swarm.json, and deploys.
+name: setup-agents
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Set up agents
+        working-directory: backend
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv sync --frozen && uv run python -m app.setup
+      - name: Commit ids
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add backend/swarm.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update agent ids"
+          git push
+      # A push made with GITHUB_TOKEN starts no workflow, so start the deploy.
+      - name: Deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main

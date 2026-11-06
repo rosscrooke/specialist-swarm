@@ -1,0 +1,19 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f6f6f4; color: #1a1a1a; }
+main { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; display: grid; gap: 1.5rem; }
+h1 { margin: 0; }
+header p { margin: 0.25rem 0 0; color: #555; }
+.input { display: grid; gap: 0.75rem; }
+textarea { width: 100%; font: 13px/1.4 ui-monospace, monospace; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; }
+button { justify-self: start; padding: 0.6rem 1.2rem; font-size: 15px; border: 0; border-radius: 6px; background: #1a1a1a; color: #fff; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+.log { background: #111; color: #ddd; border-radius: 6px; padding: 1rem; min-height: 8rem; max-height: 60vh; overflow: auto; font: 13px/1.5 ui-monospace, monospace; }
+.line { white-space: pre-wrap; }
+.thread { color: #8ab4f8; }
+.delegate { color: #fdd663; }
+.reply { color: #81c995; }
+.tool { color: #999; }
+.done { color: #81c995; font-weight: bold; }
+.error { color: #f28b82; }
+.files { display: grid; gap: 0.5rem; }
+.files h2 { margin: 0; font-size: 1.1rem; }
